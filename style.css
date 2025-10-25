@@ -1,0 +1,58 @@
+/* Math Defenders - CSS Styles */
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #0a0a0a;
+    color: #ffffff;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+#game-container {
+    text-align: center;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+#game-container h1 {
+    font-size: 2.5rem;
+    margin: 20px 0;
+    text-shadow: 2px 2px 4px rgba(0, 255, 255, 0.5);
+    letter-spacing: 2px;
+}
+
+#phaser-game {
+    border: 2px solid #00ffff;
+    border-radius: 10px;
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+/* Canvas responsive sizing */
+canvas {
+    display: block !important;
+    margin: 0 auto;
+}
+
+/* Loading screen styles */
+.loading-screen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    color: #00ffff;
+}
+
+/* UI elements that might be rendered outside canvas */
+.ui-element {
+    position: absolute;
+    z-index: 1000;
+    font-family: 'Courier New', monospace;
+    color: #ffffff;
+    text-shadow: 1px 1px 2px #000000;
+}
