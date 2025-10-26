@@ -5,10 +5,10 @@ class Enemy {
         this.x = x;
         this.y = y;
         
-    // Create enemy sprite (use damage level 0 by default)
-    this.sprite = scene.physics.add.sprite(x, y, 'enemy-ship-0');
-    // Increase size by 50%
-    this.sprite.setDisplaySize(192, 192);
+        // Create enemy sprite (use damage level 0 by default)
+        this.sprite = scene.physics.add.sprite(x, y, 'enemy-ship-0');
+        // Increase size by 50%
+        this.sprite.setDisplaySize(192, 192);
         this.sprite.setImmovable(true);
         
         // Set up physics body
@@ -16,8 +16,8 @@ class Enemy {
         
         console.log('Enemy created at:', x, y);
 
-        // Ensure correct texture based on current HP
-        this.updateTextureByHP();
+        // Ensure correct texture based on current progress (corrects)
+        this.updateTextureByProgress();
 
         // Add gentle horizontal sway
         this.addSway(x, 28, 2200);
@@ -41,11 +41,12 @@ class Enemy {
         // Add screen shake effect for impact
         this.scene.cameras.main.shake(100, 0.01);
 
-        this.updateTextureByHP();
+        this.updateTextureByProgress();
 
-        // Play destroyed animation once when HP hits 0
-        const hp = window.gameState?.enemyHP ?? 100;
-        if (hp <= 0 && !this._destroyAnimPlayed) {
+        // Play destroyed animation once when correct answers reach target
+        const correct = this.scene?.correctCount ?? 0;
+        const target = this.scene?.targetCorrect ?? 10;
+        if (correct >= target && !this._destroyAnimPlayed) {
             this._destroyAnimPlayed = true;
             this.playDestroyedAnimation();
         }
@@ -71,13 +72,15 @@ class Enemy {
         }
     }
 
-    // Choose the texture variant based on enemy HP (4 levels)
-    updateTextureByHP() {
-        const hp = window.gameState?.enemyHP ?? 100;
+    // Choose the texture variant based on correct answers progress (10 to win)
+    updateTextureByProgress() {
+        const correct = this.scene?.correctCount ?? 0;
+        const target = this.scene?.targetCorrect ?? 10;
+        const pct = Math.max(0, 100 - (correct / target) * 100);
         let idx = 0;
-        if (hp > 75) idx = 0;
-        else if (hp > 50) idx = 1;
-        else if (hp > 25) idx = 2;
+        if (pct > 75) idx = 0;
+        else if (pct > 50) idx = 1;
+        else if (pct > 25) idx = 2;
         else idx = 3;
         if (this.scene.textures.exists(`enemy-ship-${idx}`)) {
             this.sprite.setTexture(`enemy-ship-${idx}`);

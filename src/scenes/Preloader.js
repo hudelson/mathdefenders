@@ -29,7 +29,8 @@ class PreloaderScene extends Phaser.Scene {
             // Attempt to chroma-key white background out of ship images
             const keysToProcess = [
                 'player-ship-0','player-ship-1','player-ship-2','player-ship-3',
-                'enemy-ship-0','enemy-ship-1','enemy-ship-2','enemy-ship-3'
+                'enemy-ship-0','enemy-ship-1','enemy-ship-2','enemy-ship-3',
+                'enemy-missile','player-missile','hit-explosion'
             ];
             keysToProcess.forEach(k => {
                 if (this.textures.exists(k)) {
@@ -39,6 +40,9 @@ class PreloaderScene extends Phaser.Scene {
 
             // Ensure placeholders exist for any missing ship textures
             this.ensureShipPlaceholders();
+
+            // Ensure placeholders exist for any missing effect textures (after load to avoid key collisions)
+            this.ensureEffectPlaceholders();
         });
 
         // When enemy variants index is loaded, queue images for a random variant
@@ -71,6 +75,11 @@ class PreloaderScene extends Phaser.Scene {
 
         // Load index of enemy variants, then dynamically queue one variant
         this.load.json('enemyVariantsIndex', 'src/assets/enemy_ship/index.json');
+
+        // Effects (optional assets with fallbacks)
+        this.load.image('enemy-missile', 'src/assets/effects/enemy_missile.png');
+        this.load.image('player-missile', 'src/assets/effects/player_missile.png');
+        this.load.image('hit-explosion', 'src/assets/effects/explosion.png');
     }
 
     queueEnemyVariant(variantFolder) {
@@ -128,6 +137,26 @@ class PreloaderScene extends Phaser.Scene {
             .fillGradientStyle(0x000033, 0x000033, 0x000011, 0x000011)
             .fillRect(0, 0, 800, 600)
             .generateTexture('space-background', 800, 600);
+
+        // Effect placeholders are generated after load completes to avoid overriding real assets
+    }
+
+    ensureEffectPlaceholders() {
+        // Generate simple placeholders for effects only if not found after loading
+        if (!this.textures.exists('enemy-missile')) {
+            this.add.graphics().fillStyle(0xff6666)
+                .fillRect(0, 0, 8, 20).generateTexture('enemy-missile', 8, 20);
+        }
+        if (!this.textures.exists('player-missile')) {
+            this.add.graphics().fillStyle(0x66ff66)
+                .fillRect(0, 0, 8, 20).generateTexture('player-missile', 8, 20);
+        }
+        if (!this.textures.exists('hit-explosion')) {
+            const g = this.add.graphics();
+            g.fillStyle(0xffff66).fillCircle(16, 16, 16)
+                .generateTexture('hit-explosion', 32, 32);
+            g.destroy();
+        }
     }
 
     // Replace near-white pixels with transparency in a texture

@@ -10,8 +10,10 @@ class GameScene extends Phaser.Scene {
         this.isProcessingEquation = false;
         this.showingEndOverlay = false;
         this.correctCount = 0;
-        this.targetCorrect = 10; // require 10 correct answers to win
-        this.attackTimer = null;
+        this.wrongCount = 0;
+    this.targetCorrect = 10; // require 10 correct answers to win
+    this.attackTimer = null;
+    this.correctFallbackTimer = null;
     }
 
     create() {
@@ -22,8 +24,13 @@ class GameScene extends Phaser.Scene {
         this.isProcessingEquation = false;
         this.showingEndOverlay = false;
         this.correctCount = 0;
-        this.finalApproach = false;
+    this.finalApproach = false;
         this.clearTimers();
+    this.wrongCount = 0;
+    // Ensure time scales are reset (avoid slowdowns across levels)
+    this.time.timeScale = 1;
+    this.tweens.timeScale = 1;
+    this.physics.world.timeScale = 1;
         
         // Add background
         this.add.image(400, 300, 'space-background');
@@ -74,22 +81,6 @@ class GameScene extends Phaser.Scene {
                     }
                 }
             });
-
-            // Trigger final approach convergence near the player
-            if (!this.finalApproach && this.equationBlocks.getLength() > 0) {
-                const threshold = this.player.sprite.y - 180;
-                const anyClose = this.equationBlocks.children.entries.some(b => b.y >= threshold);
-                if (anyClose) {
-                    this.finalApproach = true;
-                    const rocketSpeed = 360 + (window.gameState.currentLevel * 10);
-                    this.equationBlocks.children.entries.forEach(blockSprite => {
-                        const dx = this.player.sprite.x - blockSprite.x;
-                        const dy = this.player.sprite.y - blockSprite.y;
-                        const len = Math.max(1, Math.hypot(dx, dy));
-                        blockSprite.setVelocity((dx / len) * rocketSpeed, (dy / len) * rocketSpeed);
-                    });
-                }
-            }
         }
         
         // Check collision between equation blocks and player
@@ -167,6 +158,12 @@ class GameScene extends Phaser.Scene {
         
         // Clear any existing wrong answer timer
         this.clearTimers();
+        // Defensive cleanup of any leftover equation texts
+        this.children.list.forEach(child => {
+            if (child?.getData && child.getData('equationText')) {
+                child.destroy();
+            }
+        });
         
         const level = window.gameState.currentLevel;
         const mode = window.gameState.gameMode;
@@ -244,18 +241,18 @@ class GameScene extends Phaser.Scene {
         const blockTexture = equation.specialType ? 
             `equation-block-${equation.specialType}` : 'equation-block';
         
-        // Compose equation: display + '=' + answer blanks
+    // Compose equation: display + '=' + answer blanks
         const parts = equation.display.split(' ');
         const equationParts = [...parts, '='];
         const answerLength = equation.answer.toString().length;
         const answerBlanks = Array(answerLength).fill('_');
         const allParts = [...equationParts, ...answerBlanks];
         
-        // Staging lineup above the enemy, centered
+    // Staging lineup near top center, then fall straight down in unison
     const spacing = 40;
     const totalWidth = (allParts.length - 1) * spacing;
-    const centerX = this.cameras.main.centerX; // fixed screen center for readability
-    const stageY = 150; // fixed near-top row
+    const centerX = this.cameras.main.centerX;
+    const stageY = 140;
         
         // Store answer indices for live updates
         this.answerStartIndex = equationParts.length;
@@ -263,38 +260,46 @@ class GameScene extends Phaser.Scene {
         this.playerInput = '';
         this.updateAnswerBlanks();
         
-        // Sequentially spawn blocks from enemy and tween to staging lineup at screen center
+        // Fire an enemy missile for each block to its target slot; spawn the block on missile arrival
+        let missilesCompleted = 0;
         allParts.forEach((char, index) => {
-            this.time.delayedCall(120 * index, () => {
-                const isAnswerBlank = index >= this.answerStartIndex;
-                const block = new EquationBlock(this, this.enemy.sprite.x, this.enemy.sprite.y, blockTexture, char, isAnswerBlank);
-                block.sprite.equationBlock = block;
-                this.equationBlocks.add(block.sprite);
-                
-                const targetX = centerX - (totalWidth / 2) + (index * spacing);
-                const targetY = stageY;
-                this.tweens.add({
-                    targets: block.sprite,
-                    x: targetX,
-                    y: targetY,
-                    duration: 180,
-                    ease: 'Sine.easeOut',
-                    onUpdate: () => block.updateTextPosition()
+            const isAnswerBlank = index >= this.answerStartIndex;
+            const targetX = centerX - (totalWidth / 2) + (index * spacing);
+            // Stagger missile launches slightly
+            this.time.delayedCall(60 * index, () => {
+                const m = this.spawnEnemyMissile(this.enemy.sprite.x, this.enemy.sprite.y, targetX, stageY);
+                m.on('complete', () => {
+                    m.destroy();
+                    const block = new EquationBlock(this, targetX, stageY, blockTexture, char, isAnswerBlank);
+                    block.sprite.equationBlock = block;
+                    block.updateTextPosition();
+                    this.equationBlocks.add(block.sprite);
+                    missilesCompleted++;
+                    if (missilesCompleted === allParts.length) {
+                        // After all blocks are in place, begin falling and arm the time-limit attack
+                        this.time.delayedCall(160, () => {
+                            this.beginFalling();
+                            const timeLimit = Math.max(1500, 4000 - (window.gameState.currentLevel * 150));
+                            this.attackTimer = this.time.delayedCall(timeLimit, () => {
+                                if (!this.isProcessingEquation && !this.showingEndOverlay) {
+                                    this.launchBlocksTowardPlayer();
+                                }
+                            });
+                        });
+                    }
                 });
-                
-                // After last block staged, arm a time-limit attack (do not launch immediately)
-                if (index === allParts.length - 1) {
-                    const timeLimit = Math.max(1500, 4000 - (window.gameState.currentLevel * 150));
-                    this.attackTimer = this.time.delayedCall(timeLimit, () => {
-                        if (!this.isProcessingEquation && !this.showingEndOverlay) {
-                            this.launchBlocksTowardPlayer();
-                        }
-                    });
-                }
             });
         });
         
-        console.log(`Created equation: ${equation.display} = ${'_'.repeat(answerLength)} (staging then launch)`);
+        console.log(`Created equation: ${equation.display} = ${'_'.repeat(answerLength)} (line staging; fall; blast on timeout or wrong)`);
+    }
+
+    beginFalling() {
+        if (!this.equationBlocks) return;
+        const fallSpeed = 50 + (window.gameState.currentLevel * 2);
+        this.equationBlocks.children.entries.forEach(blockSprite => {
+            blockSprite.setVelocity(0, fallSpeed);
+        });
     }
 
     launchBlocksTowardPlayer() {
@@ -345,12 +350,11 @@ class GameScene extends Phaser.Scene {
             }
         });
         
-        // Lock out further input
-        this.playerInput = '';
-        this.scene.get('UIScene').updatePlayerInput('WRONG!');
+    // Lock out further input (no overlay text)
+    this.playerInput = '';
         
-        // Set up a timer to force collision if physics doesn't detect it
-        this.wrongAnswerTimer = this.time.delayedCall(1000, () => {
+        // Set up a timer to force collision if physics doesn't detect it (shortened for responsiveness)
+        this.wrongAnswerTimer = this.time.delayedCall(600, () => {
             if (!this.collisionHandled) {
                 console.log('Force triggering collision after wrong answer');
                 this.handleBlockCollision(this.equationBlocks.children.entries[0]);
@@ -361,42 +365,53 @@ class GameScene extends Phaser.Scene {
     handleCorrectAnswer() {
         console.log('Correct answer!');
         this.isProcessingEquation = true;
-        
-        // Fire blocks rapidly back toward enemy with homing behavior
-        this.equationBlocks.children.entries.forEach(blockSprite => {
-            blockSprite.homingToEnemy = true;
-            blockSprite.setTint(0x00ff00); // Flash green
-            
-            // Also tint the EquationBlock if it exists
-            if (blockSprite.equationBlock) {
-                blockSprite.equationBlock.setTint(0x00ff00);
-            }
-        });
-        // Fallback: if somehow no overlap detected, resolve after a short delay
-        this.time.delayedCall(1200, () => {
-            if (!this.enemyHitHandled) {
-                this.handleEnemyHit();
-            }
+        // Launch a player missile to the equation cluster, then set blocks to home to enemy
+        const cluster = this.getEquationClusterCenter();
+        const pm = this.spawnPlayerMissile(this.player.sprite.x, this.player.sprite.y, cluster.x, cluster.y);
+        pm.on('complete', () => {
+            pm.destroy();
+            this.equationBlocks.children.entries.forEach(blockSprite => {
+                blockSprite.homingToEnemy = true;
+                blockSprite.setTint(0x00ff00);
+                if (blockSprite.equationBlock) {
+                    blockSprite.equationBlock.setTint(0x00ff00);
+                }
+            });
+            // Fallback: if somehow no overlap detected, resolve after a short delay
+            this.correctFallbackTimer = this.time.delayedCall(1200, () => {
+                if (!this.enemyHitHandled) {
+                    this.handleEnemyHit();
+                }
+            });
         });
         
         this.playerInput = '';
         this.scene.get('UIScene').updatePlayerInput('');
     }
 
+    getEquationClusterCenter() {
+        if (!this.equationBlocks || this.equationBlocks.getLength() === 0) {
+            return { x: this.enemy?.sprite?.x || 400, y: this.enemy?.sprite?.y || 100 };
+        }
+        let sx = 0, sy = 0, n = 0;
+        this.equationBlocks.children.entries.forEach(b => { sx += b.x; sy += b.y; n++; });
+        return { x: sx / n, y: sy / n };
+    }
+
     handleEnemyHit() {
         if (this.enemyHitHandled) return;
         this.enemyHitHandled = true;
-        // Simple explosion flash at enemy position
+        // Cancel any outstanding timers from the previous equation resolution
+        this.clearTimers();
+        // Explosion effect at enemy position
         const ex = this.enemy.sprite.x;
         const ey = this.enemy.sprite.y;
-        const boom = this.add.circle(ex, ey, 8, 0xffff66, 0.9).setDepth(999);
-        this.tweens.add({
-            targets: boom,
-            radius: 38,
-            alpha: 0,
-            duration: 220,
-            onComplete: () => boom.destroy()
-        });
+        const boom = this.add.image(ex, ey, 'hit-explosion').setDepth(999);
+        // Scale explosion to 25% of enemy ship size
+        if (this.enemy?.sprite) {
+            boom.setDisplaySize(this.enemy.sprite.displayWidth * 0.25, this.enemy.sprite.displayHeight * 0.25);
+        }
+        this.tweens.add({ targets: boom, alpha: 0, duration: 220, onComplete: () => boom.destroy() });
         this.dealDamageToEnemy();
         this.correctCount = (this.correctCount || 0) + 1;
         this.clearEquationBlocks();
@@ -419,6 +434,7 @@ class GameScene extends Phaser.Scene {
         console.log('Block collision with player!');
         this.collisionHandled = true;
         this.isProcessingEquation = true;
+        this.wrongCount = (this.wrongCount || 0) + 1;
         
         // Stop all blocks immediately
         this.equationBlocks.children.entries.forEach(blockSprite => {
@@ -431,8 +447,7 @@ class GameScene extends Phaser.Scene {
             }
         });
         
-        // Show damage feedback
-        this.scene.get('UIScene').updatePlayerInput('HIT!');
+    // No overlay text on player sprite
         
         // Deal damage to player
         this.dealDamageToPlayer();
@@ -464,6 +479,12 @@ class GameScene extends Phaser.Scene {
             }
         });
         this.equationBlocks.clear(true, true);
+        // Extra defensive cleanup for any stray texts
+        this.children.list.forEach(child => {
+            if (child?.getData && child.getData('equationText')) {
+                child.destroy();
+            }
+        });
     }
 
     dealDamageToEnemy() {
@@ -508,7 +529,7 @@ class GameScene extends Phaser.Scene {
     checkGameConditions() {
         if (!this.showingEndOverlay && this.correctCount >= this.targetCorrect) {
             this.handleLevelWin();
-        } else if (!this.showingEndOverlay && window.gameState.playerHP <= 0) {
+        } else if (!this.showingEndOverlay && this.wrongCount >= this.targetCorrect) {
             this.handleGameOver();
         }
     }
@@ -527,26 +548,30 @@ class GameScene extends Phaser.Scene {
             window.saveProgress();
         }
         
-        // Show Mission Complete overlay with next steps
-        this.showingEndOverlay = true;
-        this.showEndOverlay({
-            title: 'Mission Complete!',
-            subtitle: `+${levelBonus} SpaceBux\nSolved ${this.correctCount}/${this.targetCorrect}`,
-            primary: { label: 'Next Level ▶', action: () => this.startNextLevel() },
-            secondary: { label: 'Level Select', action: () => this.gotoLevelSelect() }
+        // Cinematic slow-mo and flashes, then overlay
+        this.doCinematicFlash(this.enemy.sprite, () => {
+            this.showingEndOverlay = true;
+            this.showEndOverlay({
+                title: 'Mission Complete!',
+                subtitle: `+${levelBonus} SpaceBux\nSolved ${this.correctCount}/${this.targetCorrect}`,
+                primary: { label: 'Next Level ▶', action: () => this.startNextLevel() },
+                secondary: { label: 'Level Select', action: () => this.gotoLevelSelect() }
+            });
         });
     }
 
     handleGameOver() {
         console.log('Game Over!');
         
-        // Show Game Over overlay with retry options
-        this.showingEndOverlay = true;
-        this.showEndOverlay({
-            title: 'Game Over',
-            subtitle: 'Try again?',
-            primary: { label: 'Retry ▶', action: () => this.retryLevel() },
-            secondary: { label: 'Main Menu', action: () => this.gotoMainMenu() }
+        // Cinematic slow-mo and flashes, then overlay
+        this.doCinematicFlash(this.player.sprite, () => {
+            this.showingEndOverlay = true;
+            this.showEndOverlay({
+                title: 'Game Over',
+                subtitle: 'Try again?',
+                primary: { label: 'Retry ▶', action: () => this.retryLevel() },
+                secondary: { label: 'Main Menu', action: () => this.gotoMainMenu() }
+            });
         });
     }
 
@@ -625,5 +650,67 @@ class GameScene extends Phaser.Scene {
             this.attackTimer.destroy();
             this.attackTimer = null;
         }
+        if (this.correctFallbackTimer) {
+            this.correctFallbackTimer.destroy();
+            this.correctFallbackTimer = null;
+        }
+    }
+
+    doCinematicFlash(targetSprite, onDone) {
+        const oldTimeScale = this.time.timeScale;
+        const oldTweenScale = this.tweens.timeScale;
+        const oldPhysScale = this.physics.world.timeScale;
+        this.time.timeScale = 0.3;
+        this.tweens.timeScale = 0.3;
+        this.physics.world.timeScale = 0.3;
+        let count = 0;
+        const tick = () => {
+            count++;
+            const boom = this.add.image(targetSprite.x, targetSprite.y, 'hit-explosion').setDepth(999);
+            // Scale explosion to 25% of target ship size
+            boom.setDisplaySize(targetSprite.displayWidth * 0.25, targetSprite.displayHeight * 0.25);
+            this.tweens.add({ targets: boom, alpha: 0, duration: 120, onComplete: () => boom.destroy() });
+            targetSprite.setTint(0xffffff);
+            this.time.delayedCall(100, () => targetSprite.clearTint());
+            if (count < 5) {
+                this.time.delayedCall(140, tick);
+            } else {
+                this.time.timeScale = oldTimeScale;
+                this.tweens.timeScale = oldTweenScale;
+                this.physics.world.timeScale = oldPhysScale;
+                onDone && onDone();
+            }
+        };
+        tick();
+    }
+
+    spawnEnemyMissile(fromX, fromY, toX, toY) {
+        const missile = this.add.image(fromX, fromY, 'enemy-missile').setDepth(900);
+        // Scale to 25% of enemy ship size
+        if (this.enemy?.sprite) {
+            missile.setDisplaySize(this.enemy.sprite.displayWidth * 0.25, this.enemy.sprite.displayHeight * 0.25);
+        }
+        const dx = toX - fromX;
+        const dy = toY - fromY;
+        const angle = Math.atan2(dy, dx);
+        missile.rotation = angle + Math.PI / 2;
+        const travel = Math.max(200, Math.hypot(dx, dy) * 1.2);
+        this.tweens.add({ targets: missile, x: toX, y: toY, duration: travel, ease: 'Sine.easeOut', onComplete: () => missile.emit('complete') });
+        return missile;
+    }
+
+    spawnPlayerMissile(fromX, fromY, toX, toY) {
+        const missile = this.add.image(fromX, fromY, 'player-missile').setDepth(900);
+        // Scale to 25% of player ship size
+        if (this.player?.sprite) {
+            missile.setDisplaySize(this.player.sprite.displayWidth * 0.25, this.player.sprite.displayHeight * 0.25);
+        }
+        const dx = toX - fromX;
+        const dy = toY - fromY;
+        const angle = Math.atan2(dy, dx);
+        missile.rotation = angle + Math.PI / 2;
+        const travel = Math.max(200, Math.hypot(dx, dy));
+        this.tweens.add({ targets: missile, x: toX, y: toY, duration: travel, ease: 'Power2', onComplete: () => missile.emit('complete') });
+        return missile;
     }
 }

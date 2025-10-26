@@ -146,15 +146,20 @@ class UIScene extends Phaser.Scene {
     }
 
     updateHealthBars() {
-        // Clear and redraw player HP bar
+        // Clear and redraw player progress bar (wrongs -> lose at 10)
+        const gameScene = this.scene.get('GameScene');
+        const wrong = gameScene?.wrongCount ?? 0;
+        const correct = gameScene?.correctCount ?? 0;
+        const target = gameScene?.targetCorrect ?? 10;
+        const playerHPPercent = Math.max(0, 1 - wrong / target);
+        const enemyHPPercent = Math.max(0, 1 - correct / target);
+
         this.playerHPBar.clear();
-        const playerHPPercent = window.gameState.playerHP / 100;
         this.playerHPBar.fillStyle(playerHPPercent > 0.3 ? 0x00ff00 : 0xff6666);
         this.playerHPBar.fillRect(20, 40, 200 * playerHPPercent, 20);
         
-        // Clear and redraw enemy HP bar
+        // Clear and redraw enemy progress bar (corrects -> win at 10)
         this.enemyHPBar.clear();
-        const enemyHPPercent = window.gameState.enemyHP / 100;
         this.enemyHPBar.fillStyle(0xff6666);
         this.enemyHPBar.fillRect(580, 40, 200 * enemyHPPercent, 20);
     }

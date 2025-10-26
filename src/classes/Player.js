@@ -7,6 +7,8 @@ class Player {
         
     // Create player sprite (use damage level 0 by default)
     this.sprite = scene.physics.add.sprite(x, y, 'player-ship-0');
+    // Flip vertically so ship points upward
+    this.sprite.setFlipY(true);
     // Increase size by 50%
     this.sprite.setDisplaySize(144, 144);
         this.sprite.setImmovable(true);
@@ -17,8 +19,8 @@ class Player {
         
         console.log('Player created at:', x, y);
 
-        // Ensure correct texture based on current HP
-        this.updateTextureByHP();
+    // Ensure correct texture based on current progress (wrongs)
+    this.updateTextureByProgress();
 
         // Add gentle horizontal sway
         this.addSway(x, 18, 1800);
@@ -39,11 +41,12 @@ class Player {
             this.sprite.clearTint();
         });
 
-        this.updateTextureByHP();
+    this.updateTextureByProgress();
 
-        // Play destroyed animation once when HP hits 0
-        const hp = window.gameState?.playerHP ?? 100;
-        if (hp <= 0 && !this._destroyAnimPlayed) {
+        // Play destroyed animation once when wrongs hit the limit
+        const wrong = this.scene?.wrongCount ?? 0;
+        const target = this.scene?.targetCorrect ?? 10;
+        if (wrong >= target && !this._destroyAnimPlayed) {
             this._destroyAnimPlayed = true;
             this.playDestroyedAnimation();
         }
@@ -59,7 +62,7 @@ class Player {
             this.sprite.clearTint();
         });
 
-        this.updateTextureByHP();
+    this.updateTextureByProgress();
     }
 
     // Method to destroy the player (cleanup)
@@ -69,13 +72,15 @@ class Player {
         }
     }
 
-    // Choose the texture variant based on player HP (4 levels)
-    updateTextureByHP() {
-        const hp = window.gameState?.playerHP ?? 100;
+    // Choose the texture variant based on wrong answers progress (10 to lose)
+    updateTextureByProgress() {
+        const wrong = this.scene?.wrongCount ?? 0;
+        const target = this.scene?.targetCorrect ?? 10;
+        const pct = Math.max(0, 100 - (wrong / target) * 100);
         let idx = 0;
-        if (hp > 75) idx = 0;
-        else if (hp > 50) idx = 1;
-        else if (hp > 25) idx = 2;
+        if (pct > 75) idx = 0;
+        else if (pct > 50) idx = 1;
+        else if (pct > 25) idx = 2;
         else idx = 3;
         if (this.scene.textures.exists(`player-ship-${idx}`)) {
             this.sprite.setTexture(`player-ship-${idx}`);

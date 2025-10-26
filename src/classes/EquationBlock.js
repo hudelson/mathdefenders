@@ -19,6 +19,9 @@ class EquationBlock {
             fontFamily: 'Courier New',
             fontStyle: 'bold'
         }).setOrigin(0.5);
+        // Mark for cleanup
+        this.text.setData('equationText', true);
+        this.sprite.setData('equationBlock', true);
         
         // Set up physics
         this.sprite.body.setSize(28, 28);
