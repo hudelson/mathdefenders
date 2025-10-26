@@ -65,21 +65,8 @@ class UIScene extends Phaser.Scene {
             fill: '#ffffff',
             fontFamily: 'Courier New'
         }).setOrigin(0.5);
-        
-        // Player input display
-        this.add.text(400, 450, 'Your Answer:', {
-            fontSize: '16px',
-            fill: '#00ffff',
-            fontFamily: 'Courier New'
-        }).setOrigin(0.5);
-        
-        this.playerInputText = this.add.text(400, 480, '', {
-            fontSize: '24px',
-            fill: '#ffffff',
-            fontFamily: 'Courier New',
-            backgroundColor: '#333333',
-            padding: { left: 20, right: 20, top: 10, bottom: 10 }
-        }).setOrigin(0.5);
+        // Removed obstructing 'Your Answer' UI to avoid covering sprites.
+        this.playerInputText = null;
     }
 
     createNumpad() {
@@ -173,27 +160,7 @@ class UIScene extends Phaser.Scene {
     }
 
     updatePlayerInput(input) {
-        const displayText = input || '_';
-        this.playerInputText.setText(displayText);
-        
-        // Change color based on input state
-        if (input === 'WRONG!' || input === 'HIT!') {
-            this.playerInputText.setStyle({
-                fontSize: '24px',
-                fill: '#ff0000',
-                fontFamily: 'Courier New',
-                backgroundColor: '#660000',
-                padding: { left: 20, right: 20, top: 10, bottom: 10 }
-            });
-        } else {
-            this.playerInputText.setStyle({
-                fontSize: '24px',
-                fill: '#ffffff',
-                fontFamily: 'Courier New',
-                backgroundColor: '#333333',
-                padding: { left: 20, right: 20, top: 10, bottom: 10 }
-            });
-        }
+        // Intentionally no-op; UI box removed to keep playfield clear
     }
 
     update() {

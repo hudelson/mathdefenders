@@ -8,6 +8,10 @@ class GameScene extends Phaser.Scene {
         this.currentEquation = null;
         this.playerInput = '';
         this.isProcessingEquation = false;
+        this.showingEndOverlay = false;
+        this.correctCount = 0;
+        this.targetCorrect = 10; // require 10 correct answers to win
+        this.attackTimer = null;
     }
 
     create() {
@@ -15,6 +19,11 @@ class GameScene extends Phaser.Scene {
         
         // Initialize flags
         this.collisionHandled = false;
+        this.isProcessingEquation = false;
+        this.showingEndOverlay = false;
+        this.correctCount = 0;
+        this.finalApproach = false;
+        this.clearTimers();
         
         // Add background
         this.add.image(400, 300, 'space-background');
@@ -33,7 +42,7 @@ class GameScene extends Phaser.Scene {
         this.scene.launch('UIScene');
         
         // Generate first equation after short delay
-        this.time.delayedCall(2000, () => {
+        this.time.delayedCall(1200, () => {
             this.generateNewEquation();
         });
         
@@ -47,6 +56,14 @@ class GameScene extends Phaser.Scene {
                 if (blockSprite.equationBlock) {
                     blockSprite.equationBlock.update();
                 }
+                // Home towards enemy if in homing mode (correct answer)
+                if (blockSprite.homingToEnemy && this.enemy?.sprite) {
+                    const dx = this.enemy.sprite.x - blockSprite.x;
+                    const dy = this.enemy.sprite.y - blockSprite.y;
+                    const len = Math.max(1, Math.hypot(dx, dy));
+                    const speed = 420 + (window.gameState.currentLevel * 10);
+                    blockSprite.setVelocity((dx / len) * speed, (dy / len) * speed);
+                }
                 
                 // Check if block has gone past the player (collision detection backup)
                 if (blockSprite.y > this.player.sprite.y + 50) {
@@ -57,6 +74,22 @@ class GameScene extends Phaser.Scene {
                     }
                 }
             });
+
+            // Trigger final approach convergence near the player
+            if (!this.finalApproach && this.equationBlocks.getLength() > 0) {
+                const threshold = this.player.sprite.y - 180;
+                const anyClose = this.equationBlocks.children.entries.some(b => b.y >= threshold);
+                if (anyClose) {
+                    this.finalApproach = true;
+                    const rocketSpeed = 360 + (window.gameState.currentLevel * 10);
+                    this.equationBlocks.children.entries.forEach(blockSprite => {
+                        const dx = this.player.sprite.x - blockSprite.x;
+                        const dy = this.player.sprite.y - blockSprite.y;
+                        const len = Math.max(1, Math.hypot(dx, dy));
+                        blockSprite.setVelocity((dx / len) * rocketSpeed, (dy / len) * rocketSpeed);
+                    });
+                }
+            }
         }
         
         // Check collision between equation blocks and player
@@ -65,9 +98,17 @@ class GameScene extends Phaser.Scene {
                 this.handleBlockCollision(blockSprite);
             });
         }
+        // Check collision between blocks and enemy when homing
+        if (this.equationBlocks && this.enemy && !this.enemyHitHandled) {
+            this.physics.overlap(this.equationBlocks, this.enemy.sprite, (enemySprite, blockSprite) => {
+                if (blockSprite.homingToEnemy) {
+                    this.handleEnemyHit();
+                }
+            });
+        }
         
-        // Check win/loss conditions
-        this.checkGameConditions();
+    // Check win/loss conditions
+    this.checkGameConditions();
     }
 
     setupInput() {
@@ -122,12 +163,10 @@ class GameScene extends Phaser.Scene {
         
         // Reset collision handling
         this.collisionHandled = false;
+        this.enemyHitHandled = false;
         
         // Clear any existing wrong answer timer
-        if (this.wrongAnswerTimer) {
-            this.wrongAnswerTimer.destroy();
-            this.wrongAnswerTimer = null;
-        }
+        this.clearTimers();
         
         const level = window.gameState.currentLevel;
         const mode = window.gameState.gameMode;
@@ -200,47 +239,72 @@ class GameScene extends Phaser.Scene {
     createEquationBlocks(equation) {
         // Clear existing blocks
         this.equationBlocks.clear(true, true);
+        this.finalApproach = false;
         
         const blockTexture = equation.specialType ? 
             `equation-block-${equation.specialType}` : 'equation-block';
         
-        // Create the equation parts: "5 × 3 = ???"
-        const parts = equation.display.split(' '); // ['5', '×', '3']
+        // Compose equation: display + '=' + answer blanks
+        const parts = equation.display.split(' ');
         const equationParts = [...parts, '='];
-        
-        // Calculate answer length for blanks
         const answerLength = equation.answer.toString().length;
         const answerBlanks = Array(answerLength).fill('_');
-        
         const allParts = [...equationParts, ...answerBlanks];
-        const startX = 400 - ((allParts.length - 1) * 20);
         
-        allParts.forEach((char, index) => {
-            const x = startX + (index * 40);
-            const y = 120;
-            
-            // Determine if this is an answer blank
-            const isAnswerBlank = index >= equationParts.length;
-            
-            const block = new EquationBlock(this, x, y, blockTexture, char, isAnswerBlank);
-            
-            // Store reference to the EquationBlock object in the sprite
-            block.sprite.equationBlock = block;
-            
-            this.equationBlocks.add(block.sprite);
-            
-            // Set velocity to move downward
-            block.setVelocityY(50 + (window.gameState.currentLevel * 2));
-        });
+        // Staging lineup above the enemy, centered
+    const spacing = 40;
+    const totalWidth = (allParts.length - 1) * spacing;
+    const centerX = this.cameras.main.centerX; // fixed screen center for readability
+    const stageY = 150; // fixed near-top row
         
-        // Store answer blank positions for updating
+        // Store answer indices for live updates
         this.answerStartIndex = equationParts.length;
         this.answerLength = answerLength;
-        
-        // Initialize answer blanks display
+        this.playerInput = '';
         this.updateAnswerBlanks();
         
-        console.log(`Created equation: ${equation.display} = ${'_'.repeat(answerLength)}`);
+        // Sequentially spawn blocks from enemy and tween to staging lineup at screen center
+        allParts.forEach((char, index) => {
+            this.time.delayedCall(120 * index, () => {
+                const isAnswerBlank = index >= this.answerStartIndex;
+                const block = new EquationBlock(this, this.enemy.sprite.x, this.enemy.sprite.y, blockTexture, char, isAnswerBlank);
+                block.sprite.equationBlock = block;
+                this.equationBlocks.add(block.sprite);
+                
+                const targetX = centerX - (totalWidth / 2) + (index * spacing);
+                const targetY = stageY;
+                this.tweens.add({
+                    targets: block.sprite,
+                    x: targetX,
+                    y: targetY,
+                    duration: 180,
+                    ease: 'Sine.easeOut',
+                    onUpdate: () => block.updateTextPosition()
+                });
+                
+                // After last block staged, arm a time-limit attack (do not launch immediately)
+                if (index === allParts.length - 1) {
+                    const timeLimit = Math.max(1500, 4000 - (window.gameState.currentLevel * 150));
+                    this.attackTimer = this.time.delayedCall(timeLimit, () => {
+                        if (!this.isProcessingEquation && !this.showingEndOverlay) {
+                            this.launchBlocksTowardPlayer();
+                        }
+                    });
+                }
+            });
+        });
+        
+        console.log(`Created equation: ${equation.display} = ${'_'.repeat(answerLength)} (staging then launch)`);
+    }
+
+    launchBlocksTowardPlayer() {
+        const speed = 80 + (window.gameState.currentLevel * 3);
+        this.equationBlocks.children.entries.forEach(blockSprite => {
+            const dx = this.player.sprite.x - blockSprite.x;
+            const dy = this.player.sprite.y - blockSprite.y;
+            const len = Math.max(1, Math.hypot(dx, dy));
+            blockSprite.setVelocity((dx / len) * speed, (dy / len) * speed);
+        });
     }
 
     checkAnswer() {
@@ -264,10 +328,15 @@ class GameScene extends Phaser.Scene {
     handleWrongAnswer() {
         console.log('Wrong answer! Rocketing blocks at player...');
         this.isProcessingEquation = true;
+        this.clearTimers();
         
-        // Speed up blocks significantly toward player
+        // Speed up blocks significantly toward player (vector toward player center)
         this.equationBlocks.children.entries.forEach(blockSprite => {
-            blockSprite.setVelocityY(300 + (window.gameState.currentLevel * 15)); // Much faster
+            const dx = this.player.sprite.x - blockSprite.x;
+            const dy = this.player.sprite.y - blockSprite.y;
+            const len = Math.max(1, Math.hypot(dx, dy));
+            const speed = 360 + (window.gameState.currentLevel * 15);
+            blockSprite.setVelocity((dx / len) * speed, (dy / len) * speed);
             blockSprite.setTint(0xff0000); // Flash red immediately
             
             // Also tint the EquationBlock if it exists
@@ -293,9 +362,9 @@ class GameScene extends Phaser.Scene {
         console.log('Correct answer!');
         this.isProcessingEquation = true;
         
-        // Reverse block direction and speed them up
+        // Fire blocks rapidly back toward enemy with homing behavior
         this.equationBlocks.children.entries.forEach(blockSprite => {
-            blockSprite.setVelocityY(-150); // Move back toward enemy
+            blockSprite.homingToEnemy = true;
             blockSprite.setTint(0x00ff00); // Flash green
             
             // Also tint the EquationBlock if it exists
@@ -303,21 +372,44 @@ class GameScene extends Phaser.Scene {
                 blockSprite.equationBlock.setTint(0x00ff00);
             }
         });
-        
-        // Deal damage to enemy after blocks reach it
-        this.time.delayedCall(1000, () => {
-            this.dealDamageToEnemy();
-            this.clearEquationBlocks();
-            
-            // Generate next equation after delay
-            this.time.delayedCall(1500, () => {
-                this.isProcessingEquation = false;
-                this.generateNewEquation();
-            });
+        // Fallback: if somehow no overlap detected, resolve after a short delay
+        this.time.delayedCall(1200, () => {
+            if (!this.enemyHitHandled) {
+                this.handleEnemyHit();
+            }
         });
         
         this.playerInput = '';
         this.scene.get('UIScene').updatePlayerInput('');
+    }
+
+    handleEnemyHit() {
+        if (this.enemyHitHandled) return;
+        this.enemyHitHandled = true;
+        // Simple explosion flash at enemy position
+        const ex = this.enemy.sprite.x;
+        const ey = this.enemy.sprite.y;
+        const boom = this.add.circle(ex, ey, 8, 0xffff66, 0.9).setDepth(999);
+        this.tweens.add({
+            targets: boom,
+            radius: 38,
+            alpha: 0,
+            duration: 220,
+            onComplete: () => boom.destroy()
+        });
+        this.dealDamageToEnemy();
+        this.correctCount = (this.correctCount || 0) + 1;
+        this.clearEquationBlocks();
+        
+        // Next step depending on progress
+        this.time.delayedCall(600, () => {
+            if (this.correctCount >= this.targetCorrect) {
+                this.handleLevelWin();
+            } else if (window.gameState.playerHP > 0 && !this.showingEndOverlay) {
+                this.isProcessingEquation = false;
+                this.generateNewEquation();
+            }
+        });
     }
 
     handleBlockCollision(blockSprite) {
@@ -383,10 +475,16 @@ class GameScene extends Phaser.Scene {
         }
         
         window.gameState.enemyHP = Math.max(0, window.gameState.enemyHP - damage);
+        if (this.enemy && typeof this.enemy.takeDamage === 'function') {
+            this.enemy.takeDamage(damage);
+        }
         
         if (this.currentEquation.specialType === 'green') {
             // Heal player
             window.gameState.playerHP = Math.min(100, window.gameState.playerHP + 15);
+            if (this.player && typeof this.player.heal === 'function') {
+                this.player.heal(15);
+            }
         } else if (this.currentEquation.specialType === 'gold') {
             // Award bonus SpaceBux
             const bonus = window.gameState.currentLevel * 10;
@@ -408,9 +506,9 @@ class GameScene extends Phaser.Scene {
     }
 
     checkGameConditions() {
-        if (window.gameState.enemyHP <= 0) {
+        if (!this.showingEndOverlay && this.correctCount >= this.targetCorrect) {
             this.handleLevelWin();
-        } else if (window.gameState.playerHP <= 0) {
+        } else if (!this.showingEndOverlay && window.gameState.playerHP <= 0) {
             this.handleGameOver();
         }
     }
@@ -429,16 +527,103 @@ class GameScene extends Phaser.Scene {
             window.saveProgress();
         }
         
-        // Stop UI scene and return to level select
-        this.scene.stop('UIScene');
-        this.scene.start('LevelSelectScene');
+        // Show Mission Complete overlay with next steps
+        this.showingEndOverlay = true;
+        this.showEndOverlay({
+            title: 'Mission Complete!',
+            subtitle: `+${levelBonus} SpaceBux\nSolved ${this.correctCount}/${this.targetCorrect}`,
+            primary: { label: 'Next Level ▶', action: () => this.startNextLevel() },
+            secondary: { label: 'Level Select', action: () => this.gotoLevelSelect() }
+        });
     }
 
     handleGameOver() {
         console.log('Game Over!');
         
-        // Stop UI scene and return to main menu
+        // Show Game Over overlay with retry options
+        this.showingEndOverlay = true;
+        this.showEndOverlay({
+            title: 'Game Over',
+            subtitle: 'Try again?',
+            primary: { label: 'Retry ▶', action: () => this.retryLevel() },
+            secondary: { label: 'Main Menu', action: () => this.gotoMainMenu() }
+        });
+    }
+
+    showEndOverlay({ title, subtitle, primary, secondary }) {
+        // Pause block movement
+        this.equationBlocks?.children?.entries?.forEach(b => b.setVelocity(0, 0));
+        
+        // Dim background
+        const overlay = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.6).setDepth(1000);
+        const panel = this.add.rectangle(400, 300, 460, 220, 0x111122, 0.95).setStrokeStyle(2, 0x00ffff).setDepth(1001);
+        const titleText = this.add.text(400, 250, title, { fontSize: '32px', fill: '#00ffff', fontFamily: 'Courier New' }).setOrigin(0.5).setDepth(1002);
+        const subText = this.add.text(400, 285, subtitle || '', { fontSize: '18px', fill: '#ffffff', fontFamily: 'Courier New' }).setOrigin(0.5).setDepth(1002);
+        
+        const primaryBtn = this.add.text(400, 330, primary.label, {
+            fontSize: '22px', fill: '#000000', backgroundColor: '#00ffff', fontFamily: 'Courier New', padding: { left: 18, right: 18, top: 8, bottom: 8 }
+        }).setOrigin(0.5).setDepth(1002).setInteractive({ useHandCursor: true });
+        primaryBtn.on('pointerdown', () => { cleanup(); primary.action(); });
+        
+        const secondaryBtn = this.add.text(400, 375, secondary.label, {
+            fontSize: '18px', fill: '#ffffff', backgroundColor: '#333333', fontFamily: 'Courier New', padding: { left: 14, right: 14, top: 6, bottom: 6 }
+        }).setOrigin(0.5).setDepth(1002).setInteractive({ useHandCursor: true });
+        secondaryBtn.on('pointerdown', () => { cleanup(); secondary.action(); });
+        
+        const cleanup = () => {
+            overlay.destroy(); panel.destroy(); titleText.destroy(); subText.destroy(); primaryBtn.destroy(); secondaryBtn.destroy();
+        };
+    }
+
+    startNextLevel() {
+        window.gameState.currentLevel += 1;
+        window.gameState.playerHP = 100;
+        window.gameState.enemyHP = 100;
+        this.showingEndOverlay = false;
+        this.isProcessingEquation = false;
+        this.correctCount = 0;
+        this.clearTimers();
+        this.clearEquationBlocks();
+        this.scene.stop('UIScene');
+        this.scene.restart();
+    }
+
+    retryLevel() {
+        window.gameState.playerHP = 100;
+        window.gameState.enemyHP = 100;
+        this.showingEndOverlay = false;
+        this.isProcessingEquation = false;
+        this.correctCount = 0;
+        this.clearTimers();
+        this.clearEquationBlocks();
+        this.scene.stop('UIScene');
+        this.scene.restart();
+    }
+
+    gotoLevelSelect() {
+        this.showingEndOverlay = false;
+        this.isProcessingEquation = false;
+        this.clearTimers();
+        this.scene.stop('UIScene');
+        this.scene.start('LevelSelectScene');
+    }
+
+    gotoMainMenu() {
+        this.showingEndOverlay = false;
+        this.isProcessingEquation = false;
+        this.clearTimers();
         this.scene.stop('UIScene');
         this.scene.start('MainMenuScene');
+    }
+
+    clearTimers() {
+        if (this.wrongAnswerTimer) {
+            this.wrongAnswerTimer.destroy();
+            this.wrongAnswerTimer = null;
+        }
+        if (this.attackTimer) {
+            this.attackTimer.destroy();
+            this.attackTimer = null;
+        }
     }
 }

@@ -5,15 +5,22 @@ class Enemy {
         this.x = x;
         this.y = y;
         
-        // Create enemy sprite
-        this.sprite = scene.physics.add.sprite(x, y, 'enemy-ship');
-        this.sprite.setDisplaySize(48, 48);
+    // Create enemy sprite (use damage level 0 by default)
+    this.sprite = scene.physics.add.sprite(x, y, 'enemy-ship-0');
+    // Increase size by 50%
+    this.sprite.setDisplaySize(192, 192);
         this.sprite.setImmovable(true);
         
         // Set up physics body
         this.sprite.body.setSize(40, 40);
         
         console.log('Enemy created at:', x, y);
+
+        // Ensure correct texture based on current HP
+        this.updateTextureByHP();
+
+        // Add gentle horizontal sway
+        this.addSway(x, 28, 2200);
     }
 
     // Method to update enemy (for future behaviors)
@@ -33,6 +40,15 @@ class Enemy {
         
         // Add screen shake effect for impact
         this.scene.cameras.main.shake(100, 0.01);
+
+        this.updateTextureByHP();
+
+        // Play destroyed animation once when HP hits 0
+        const hp = window.gameState?.enemyHP ?? 100;
+        if (hp <= 0 && !this._destroyAnimPlayed) {
+            this._destroyAnimPlayed = true;
+            this.playDestroyedAnimation();
+        }
     }
 
     // Method to animate equation launching
@@ -53,5 +69,42 @@ class Enemy {
         if (this.sprite) {
             this.sprite.destroy();
         }
+    }
+
+    // Choose the texture variant based on enemy HP (4 levels)
+    updateTextureByHP() {
+        const hp = window.gameState?.enemyHP ?? 100;
+        let idx = 0;
+        if (hp > 75) idx = 0;
+        else if (hp > 50) idx = 1;
+        else if (hp > 25) idx = 2;
+        else idx = 3;
+        if (this.scene.textures.exists(`enemy-ship-${idx}`)) {
+            this.sprite.setTexture(`enemy-ship-${idx}`);
+        }
+    }
+
+    playDestroyedAnimation() {
+        // Quick scale pop + fade flash
+        this.scene.tweens.add({
+            targets: this.sprite,
+            scaleX: this.sprite.scaleX * 1.15,
+            scaleY: this.sprite.scaleY * 1.15,
+            duration: 150,
+            yoyo: true,
+            onStart: () => this.sprite.setTint(0xffffff),
+            onYoyo: () => this.sprite.clearTint()
+        });
+    }
+
+    addSway(originX, amplitude = 24, duration = 2200) {
+        this.scene.tweens.add({
+            targets: this.sprite,
+            x: originX + amplitude,
+            duration,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1
+        });
     }
 }
