@@ -32,8 +32,12 @@ class GameScene extends Phaser.Scene {
     this.tweens.timeScale = 1;
     this.physics.world.timeScale = 1;
         
-        // Add background
-        this.add.image(400, 300, 'space-background');
+        // Add background (tiled galaxy if available, else gradient fallback)
+        if (this.textures.exists('bg-galaxy')) {
+            this.createTiledBackground();
+        } else {
+            this.add.image(400, 300, 'space-background');
+        }
         
         // Create player and enemy
         this.player = new Player(this, 400, 500);
@@ -155,6 +159,11 @@ class GameScene extends Phaser.Scene {
         // Reset collision handling
         this.collisionHandled = false;
         this.enemyHitHandled = false;
+        // Arm a watchdog to ensure a new equation appears if something gets stuck
+        if (this.spawnWatchdog) {
+            this.spawnWatchdog.destroy();
+            this.spawnWatchdog = null;
+        }
         
         // Clear any existing wrong answer timer
         this.clearTimers();
@@ -173,6 +182,13 @@ class GameScene extends Phaser.Scene {
         
         // Create visual equation blocks
         this.createEquationBlocks(this.currentEquation);
+        // Watchdog: if no blocks exist after a while and no overlay shown, try again
+        this.spawnWatchdog = this.time.delayedCall(8000, () => {
+            if (!this.showingEndOverlay && !this.isProcessingEquation && this.equationBlocks?.getLength?.() === 0) {
+                console.warn('Watchdog: respawning equation due to stall');
+                this.generateNewEquation();
+            }
+        });
         
         console.log(`Generated equation: ${this.currentEquation.display} = ${this.currentEquation.answer}`);
     }
@@ -403,16 +419,13 @@ class GameScene extends Phaser.Scene {
         this.enemyHitHandled = true;
         // Cancel any outstanding timers from the previous equation resolution
         this.clearTimers();
-        // Explosion effect at enemy position
-        const ex = this.enemy.sprite.x;
-        const ey = this.enemy.sprite.y;
-        const boom = this.add.image(ex, ey, 'hit-explosion').setDepth(999);
-        // Scale explosion to 25% of enemy ship size
-        if (this.enemy?.sprite) {
-            boom.setDisplaySize(this.enemy.sprite.displayWidth * 0.25, this.enemy.sprite.displayHeight * 0.25);
-        }
-        this.tweens.add({ targets: boom, alpha: 0, duration: 220, onComplete: () => boom.destroy() });
+        // Always show a small impact burst, plus a larger burst on lethal
+        this.spawnShipExplosions(this.enemy.sprite, Phaser.Math.Between(1, 2));
+        // Deal damage then maybe show a larger death burst
         this.dealDamageToEnemy();
+        if ((window.gameState?.enemyHP ?? 0) <= 0) {
+            this.spawnShipExplosions(this.enemy.sprite, Phaser.Math.Between(3, 5));
+        }
         this.correctCount = (this.correctCount || 0) + 1;
         this.clearEquationBlocks();
         
@@ -435,7 +448,17 @@ class GameScene extends Phaser.Scene {
         this.collisionHandled = true;
         this.isProcessingEquation = true;
         this.wrongCount = (this.wrongCount || 0) + 1;
+        // Clear any pending timers to avoid delayed double-triggers
+        this.clearTimers();
         
+        // Always show a small impact burst, plus a larger burst on lethal
+        this.spawnShipExplosions(this.player.sprite, Phaser.Math.Between(1, 2));
+        // Deal damage to player then maybe show a larger death burst
+        this.dealDamageToPlayer();
+        if ((window.gameState?.playerHP ?? 0) <= 0) {
+            this.spawnShipExplosions(this.player.sprite, Phaser.Math.Between(3, 5));
+        }
+
         // Stop all blocks immediately
         this.equationBlocks.children.entries.forEach(blockSprite => {
             blockSprite.setVelocity(0, 0);
@@ -449,23 +472,17 @@ class GameScene extends Phaser.Scene {
         
     // No overlay text on player sprite
         
-        // Deal damage to player
-        this.dealDamageToPlayer();
-        
         // Add screen shake for impact
         this.cameras.main.shake(200, 0.02);
         
-        // Clear blocks and generate new equation
-        this.time.delayedCall(800, () => {
-            this.clearEquationBlocks();
-            
-            this.time.delayedCall(1200, () => {
-                this.collisionHandled = false;
-                this.isProcessingEquation = false;
-                if (window.gameState.playerHP > 0) {
-                    this.generateNewEquation();
-                }
-            });
+        // Clear blocks immediately (match enemy behavior) and schedule next
+        this.clearEquationBlocks();
+        this.time.delayedCall(600, () => {
+            this.collisionHandled = false;
+            this.isProcessingEquation = false;
+            if (window.gameState.playerHP > 0 && !this.showingEndOverlay) {
+                this.generateNewEquation();
+            }
         });
         
         this.playerInput = '';
@@ -557,7 +574,7 @@ class GameScene extends Phaser.Scene {
                 primary: { label: 'Next Level ▶', action: () => this.startNextLevel() },
                 secondary: { label: 'Level Select', action: () => this.gotoLevelSelect() }
             });
-        });
+        }, (window.gameState?.enemyHP ?? 0) <= 0);
     }
 
     handleGameOver() {
@@ -572,7 +589,7 @@ class GameScene extends Phaser.Scene {
                 primary: { label: 'Retry ▶', action: () => this.retryLevel() },
                 secondary: { label: 'Main Menu', action: () => this.gotoMainMenu() }
             });
-        });
+        }, (window.gameState?.playerHP ?? 0) <= 0);
     }
 
     showEndOverlay({ title, subtitle, primary, secondary }) {
@@ -654,9 +671,13 @@ class GameScene extends Phaser.Scene {
             this.correctFallbackTimer.destroy();
             this.correctFallbackTimer = null;
         }
+        if (this.spawnWatchdog) {
+            this.spawnWatchdog.destroy();
+            this.spawnWatchdog = null;
+        }
     }
 
-    doCinematicFlash(targetSprite, onDone) {
+    doCinematicFlash(targetSprite, onDone, showExplosions = false) {
         const oldTimeScale = this.time.timeScale;
         const oldTweenScale = this.tweens.timeScale;
         const oldPhysScale = this.physics.world.timeScale;
@@ -666,10 +687,12 @@ class GameScene extends Phaser.Scene {
         let count = 0;
         const tick = () => {
             count++;
-            const boom = this.add.image(targetSprite.x, targetSprite.y, 'hit-explosion').setDepth(999);
-            // Scale explosion to 25% of target ship size
-            boom.setDisplaySize(targetSprite.displayWidth * 0.25, targetSprite.displayHeight * 0.25);
-            this.tweens.add({ targets: boom, alpha: 0, duration: 120, onComplete: () => boom.destroy() });
+            if (showExplosions) {
+                const boom = this.add.image(targetSprite.x, targetSprite.y, 'hit-explosion').setDepth(999);
+                // Scale explosion to 25% of target ship size
+                boom.setDisplaySize(targetSprite.displayWidth * 0.25, targetSprite.displayHeight * 0.25);
+                this.tweens.add({ targets: boom, alpha: 0, duration: 120, onComplete: () => boom.destroy() });
+            }
             targetSprite.setTint(0xffffff);
             this.time.delayedCall(100, () => targetSprite.clearTint());
             if (count < 5) {
@@ -712,5 +735,47 @@ class GameScene extends Phaser.Scene {
         const travel = Math.max(200, Math.hypot(dx, dy));
         this.tweens.add({ targets: missile, x: toX, y: toY, duration: travel, ease: 'Power2', onComplete: () => missile.emit('complete') });
         return missile;
+    }
+
+    // Spawn several small explosions randomly over a ship sprite
+    spawnShipExplosions(targetSprite, count = 3) {
+        const w = targetSprite.displayWidth;
+        const h = targetSprite.displayHeight;
+        for (let i = 0; i < count; i++) {
+            const delay = Phaser.Math.Between(0, 180);
+            this.time.delayedCall(delay, () => {
+                // Random offset within an ellipse over the sprite
+                const rx = (Math.random() * 2 - 1) * (w * 0.25);
+                const ry = (Math.random() * 2 - 1) * (h * 0.25);
+                const boom = this.add.image(targetSprite.x + rx, targetSprite.y + ry, 'hit-explosion').setDepth(999);
+                const scale = Phaser.Math.FloatBetween(0.18, 0.3);
+                boom.setDisplaySize(targetSprite.displayWidth * scale, targetSprite.displayHeight * scale);
+                this.tweens.add({ targets: boom, alpha: 0, duration: Phaser.Math.Between(160, 260), onComplete: () => boom.destroy() });
+            });
+        }
+    }
+
+    // Create a tiled galaxy background with random flips
+    createTiledBackground() {
+        const cam = this.cameras.main;
+        const w = cam.width;
+        const h = cam.height;
+        const tex = this.textures.get('bg-galaxy').getSourceImage();
+        const tw = tex.naturalWidth || tex.width;
+        const th = tex.naturalHeight || tex.height;
+        const cols = Math.ceil(w / tw) + 1;
+        const rows = Math.ceil(h / th) + 1;
+        const rt = this.add.renderTexture(0, 0, w, h).setOrigin(0).setDepth(-10);
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const x = c * tw + tw / 2;
+                const y = r * th + th / 2;
+                const tile = this.add.image(x, y, 'bg-galaxy').setVisible(false);
+                tile.setFlipX(Math.random() < 0.5);
+                tile.setFlipY(Math.random() < 0.5);
+                rt.draw(tile, x, y);
+                tile.destroy();
+            }
+        }
     }
 }

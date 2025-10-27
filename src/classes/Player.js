@@ -22,8 +22,15 @@ class Player {
     // Ensure correct texture based on current progress (wrongs)
     this.updateTextureByProgress();
 
-        // Add gentle horizontal sway
-        this.addSway(x, 18, 1800);
+    // Add desynced, randomized sway and bob
+    const ampX = Phaser.Math.Between(12, 28);
+    const durX = Phaser.Math.Between(1600, 2600);
+    const delayX = Phaser.Math.Between(0, 1200);
+    this.addSway(x, ampX, durX, delayX);
+    const ampY = Phaser.Math.Between(4, 10);
+    const durY = Phaser.Math.Between(1400, 2200);
+    const delayY = Phaser.Math.Between(0, 900);
+    this.addBob(this.y, ampY, durY, delayY);
     }
 
     // Method to update player (for future movement controls)
@@ -43,10 +50,9 @@ class Player {
 
     this.updateTextureByProgress();
 
-        // Play destroyed animation once when wrongs hit the limit
-        const wrong = this.scene?.wrongCount ?? 0;
-        const target = this.scene?.targetCorrect ?? 10;
-        if (wrong >= target && !this._destroyAnimPlayed) {
+        // Play destroyed animation once when HP reaches 0
+        const hp = Math.max(0, window.gameState?.playerHP ?? 100);
+        if (hp === 0 && !this._destroyAnimPlayed) {
             this._destroyAnimPlayed = true;
             this.playDestroyedAnimation();
         }
@@ -72,16 +78,14 @@ class Player {
         }
     }
 
-    // Choose the texture variant based on wrong answers progress (10 to lose)
+    // Choose the texture variant based on player HP. Only show 'destroyed' at 0 HP.
     updateTextureByProgress() {
-        const wrong = this.scene?.wrongCount ?? 0;
-        const target = this.scene?.targetCorrect ?? 10;
-        const pct = Math.max(0, 100 - (wrong / target) * 100);
+        const hp = Math.max(0, window.gameState?.playerHP ?? 100);
         let idx = 0;
-        if (pct > 75) idx = 0;
-        else if (pct > 50) idx = 1;
-        else if (pct > 25) idx = 2;
-        else idx = 3;
+        if (hp === 0) idx = 3;
+        else if (hp > 66) idx = 0;
+        else if (hp > 33) idx = 1;
+        else idx = 2;
         if (this.scene.textures.exists(`player-ship-${idx}`)) {
             this.sprite.setTexture(`player-ship-${idx}`);
         }
@@ -100,14 +104,27 @@ class Player {
         });
     }
 
-    addSway(originX, amplitude = 16, duration = 2000) {
+    addSway(originX, amplitude = 16, duration = 2000, delay = 0) {
         this.scene.tweens.add({
             targets: this.sprite,
             x: originX + amplitude,
             duration,
             ease: 'Sine.easeInOut',
             yoyo: true,
-            repeat: -1
+            repeat: -1,
+            delay
+        });
+    }
+
+    addBob(originY, amplitude = 6, duration = 1800, delay = 0) {
+        this.scene.tweens.add({
+            targets: this.sprite,
+            y: originY + amplitude,
+            duration,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            delay
         });
     }
 }

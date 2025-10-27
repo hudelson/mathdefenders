@@ -17,10 +17,17 @@ class Enemy {
         console.log('Enemy created at:', x, y);
 
         // Ensure correct texture based on current progress (corrects)
-        this.updateTextureByProgress();
+    this.updateTextureByProgress();
 
-        // Add gentle horizontal sway
-        this.addSway(x, 28, 2200);
+    // Add desynced, randomized sway and bob
+    const ampX = Phaser.Math.Between(18, 36);
+    const durX = Phaser.Math.Between(1700, 2800);
+    const delayX = Phaser.Math.Between(0, 1300);
+    this.addSway(x, ampX, durX, delayX);
+    const ampY = Phaser.Math.Between(6, 14);
+    const durY = Phaser.Math.Between(1500, 2400);
+    const delayY = Phaser.Math.Between(0, 1000);
+    this.addBob(this.y, ampY, durY, delayY);
     }
 
     // Method to update enemy (for future behaviors)
@@ -43,10 +50,9 @@ class Enemy {
 
         this.updateTextureByProgress();
 
-        // Play destroyed animation once when correct answers reach target
-        const correct = this.scene?.correctCount ?? 0;
-        const target = this.scene?.targetCorrect ?? 10;
-        if (correct >= target && !this._destroyAnimPlayed) {
+        // Play destroyed animation once when HP reaches 0
+        const hp = Math.max(0, window.gameState?.enemyHP ?? 100);
+        if (hp === 0 && !this._destroyAnimPlayed) {
             this._destroyAnimPlayed = true;
             this.playDestroyedAnimation();
         }
@@ -72,16 +78,14 @@ class Enemy {
         }
     }
 
-    // Choose the texture variant based on correct answers progress (10 to win)
+    // Choose the texture variant based on enemy HP. Only show 'destroyed' at 0 HP.
     updateTextureByProgress() {
-        const correct = this.scene?.correctCount ?? 0;
-        const target = this.scene?.targetCorrect ?? 10;
-        const pct = Math.max(0, 100 - (correct / target) * 100);
+        const hp = Math.max(0, window.gameState?.enemyHP ?? 100);
         let idx = 0;
-        if (pct > 75) idx = 0;
-        else if (pct > 50) idx = 1;
-        else if (pct > 25) idx = 2;
-        else idx = 3;
+        if (hp === 0) idx = 3;
+        else if (hp > 66) idx = 0;
+        else if (hp > 33) idx = 1;
+        else idx = 2;
         if (this.scene.textures.exists(`enemy-ship-${idx}`)) {
             this.sprite.setTexture(`enemy-ship-${idx}`);
         }
@@ -100,14 +104,27 @@ class Enemy {
         });
     }
 
-    addSway(originX, amplitude = 24, duration = 2200) {
+    addSway(originX, amplitude = 24, duration = 2200, delay = 0) {
         this.scene.tweens.add({
             targets: this.sprite,
             x: originX + amplitude,
             duration,
             ease: 'Sine.easeInOut',
             yoyo: true,
-            repeat: -1
+            repeat: -1,
+            delay
+        });
+    }
+
+    addBob(originY, amplitude = 8, duration = 2000, delay = 0) {
+        this.scene.tweens.add({
+            targets: this.sprite,
+            y: originY + amplitude,
+            duration,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            delay
         });
     }
 }

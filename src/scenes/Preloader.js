@@ -30,13 +30,18 @@ class PreloaderScene extends Phaser.Scene {
             const keysToProcess = [
                 'player-ship-0','player-ship-1','player-ship-2','player-ship-3',
                 'enemy-ship-0','enemy-ship-1','enemy-ship-2','enemy-ship-3',
-                'enemy-missile','player-missile','hit-explosion'
+                'enemy-missile','player-missile'
             ];
             keysToProcess.forEach(k => {
                 if (this.textures.exists(k)) {
                     this.chromaKeyTexture(k, { r: 255, g: 255, b: 255 }, 245);
                 }
             });
+
+            // For explosion, chroma-key only the background by sampling corner color
+            if (this.textures.exists('hit-explosion')) {
+                this.chromaKeyByCornerColor('hit-explosion', 18);
+            }
 
             // Ensure placeholders exist for any missing ship textures
             this.ensureShipPlaceholders();
@@ -80,6 +85,9 @@ class PreloaderScene extends Phaser.Scene {
         this.load.image('enemy-missile', 'src/assets/effects/enemy_missile.png');
         this.load.image('player-missile', 'src/assets/effects/player_missile.png');
         this.load.image('hit-explosion', 'src/assets/effects/explosion.png');
+
+        // Background image
+        this.load.image('bg-galaxy', 'src/assets/background/galaxy.png');
     }
 
     queueEnemyVariant(variantFolder) {
@@ -188,6 +196,48 @@ class PreloaderScene extends Phaser.Scene {
             console.log(`Chroma-key applied to texture: ${key}`);
         } catch (e) {
             console.warn(`Chroma-key failed for ${key}:`, e);
+        }
+    }
+
+    // Chroma-key using the color in the top-left pixel as background, with tolerance
+    chromaKeyByCornerColor(key, tolerance = 16) {
+        try {
+            const src = this.textures.get(key).getSourceImage();
+            if (!src || !(src instanceof HTMLImageElement)) return;
+            const w = src.naturalWidth || src.width;
+            const h = src.naturalHeight || src.height;
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(src, 0, 0);
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const data = imgData.data;
+            // Sample corner pixel color
+            const R = data[0], G = data[1], B = data[2], A = data[3];
+            // If the corner is already transparent, skip chroma-keying
+            if (A <= 10) {
+                console.log(`Corner alpha transparent; skipping chroma-key for ${key}`);
+                return;
+            }
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const a = data[i + 3];
+                const dr = Math.abs(r - R);
+                const dg = Math.abs(g - G);
+                const db = Math.abs(b - B);
+                if (a > 32 && dr <= tolerance && dg <= tolerance && db <= tolerance) {
+                    data[i + 3] = 0; // transparent
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+            this.textures.remove(key);
+            this.textures.addCanvas(key, canvas);
+            console.log(`Chroma-key (corner) applied to texture: ${key}`);
+        } catch (e) {
+            console.warn(`Corner chroma-key failed for ${key}:`, e);
         }
     }
 
