@@ -23,6 +23,8 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       # Optional: add a basic health check to ensure index.html exists
       - name: Verify site entrypoint
