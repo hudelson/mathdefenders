@@ -20,14 +20,20 @@ class ShopScene extends Phaser.Scene {
         // Display buddy (lower right)
         this.displayBuddy();
         
-        // Current SpaceBux display (top right)
-        this.add.text(720, 30, `SpaceBux: ${window.gameState.spaceBux}`, {
+        // Current SpaceBux display (top right) with background box
+        const spaceBuxBg = this.add.graphics();
+        spaceBuxBg.fillStyle(0x000000, 0.7);
+        spaceBuxBg.fillRoundedRect(560, 20, 160, 40, 8);
+        spaceBuxBg.lineStyle(2, 0xffff00, 1);
+        spaceBuxBg.strokeRoundedRect(560, 20, 160, 40, 8);
+        
+        this.add.text(640, 40, `SpaceBux: ${window.gameState.spaceBux}`, {
             fontSize: '18px',
             fill: '#ffff00',
             fontFamily: 'Courier New',
             stroke: '#000000',
             strokeThickness: 2
-        }).setOrigin(1, 0);
+        }).setOrigin(0.5, 0.5);
         
         // Back button (top left)
         const backButton = this.add.text(80, 30, '← Back', {
