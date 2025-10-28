@@ -30,8 +30,26 @@ class PreloaderScene extends Phaser.Scene {
             const keysToProcess = [
                 'player-ship-0','player-ship-1','player-ship-2','player-ship-3',
                 'enemy-ship-0','enemy-ship-1','enemy-ship-2','enemy-ship-3',
-                'enemy-missile','player-missile'
+                'enemy-missile','player-missile',
+                'outfit-light-blue','buddy-normal'
             ];
+            
+            // Add all shop ships
+            const shopShipIds = ['blue_fancy', 'cyber', 'falcon', 'green', 'red', 'white', 'xwing'];
+            shopShipIds.forEach(id => keysToProcess.push(`shop-ship-${id}`));
+            
+            // Add all shop outfits
+            const outfitIds = [
+                'light_blue', 'light_black', 'light_gold', 'light_green', 'light_red',
+                'heavy_blue', 'heavy_black', 'heavy_gold', 'heavy_green', 'heavy_red'
+            ];
+            outfitIds.forEach(id => keysToProcess.push(`shop-outfit-${id}`));
+            
+            // Add all shop buddies
+            const buddyIds = ['normal', 'alien', 'aristocrat', 'chef', 'cyber', 'fancy', 
+                             'ghost', 'log_cabin', 'lumberjack', 'ninja', 'r2d2', 'red', 'toaster'];
+            buddyIds.forEach(id => keysToProcess.push(`shop-buddy-${id}`));
+            
             keysToProcess.forEach(k => {
                 if (this.textures.exists(k)) {
                     this.chromaKeyTexture(k, { r: 255, g: 255, b: 255 }, 245);
@@ -72,11 +90,11 @@ class PreloaderScene extends Phaser.Scene {
     }
 
     loadRealAssets() {
-        // Player ship images (static paths)
-        this.load.image('player-ship-0', 'src/assets/player_ship/0_full_health.png');
-        this.load.image('player-ship-1', 'src/assets/player_ship/1_minor_damage.png');
-        this.load.image('player-ship-2', 'src/assets/player_ship/2_heavy_damage.png');
-        this.load.image('player-ship-3', 'src/assets/player_ship/3_destroyed.png');
+        // Player ship images (now from shop/ships/0/)
+        this.load.image('player-ship-0', 'src/assets/shop/ships/0/0_full_health.png');
+        this.load.image('player-ship-1', 'src/assets/shop/ships/0/1_minor_damage.png');
+        this.load.image('player-ship-2', 'src/assets/shop/ships/0/2_heavy_damage.png');
+        this.load.image('player-ship-3', 'src/assets/shop/ships/0/3_destroyed.png');
 
         // Load index of enemy variants, then dynamically queue one variant
         this.load.json('enemyVariantsIndex', 'src/assets/enemy_ship/index.json');
@@ -88,6 +106,71 @@ class PreloaderScene extends Phaser.Scene {
 
         // Background image
         this.load.image('bg-galaxy', 'src/assets/background/galaxy.png');
+        
+        // Shop assets
+        this.load.image('bg-shop', 'src/assets/background/shop.png');
+        this.load.image('outfit-light-blue', 'src/assets/shop/outfits/light_blue.png');
+        this.load.image('buddy-normal', 'src/assets/shop/buddy/0_normal.png');
+        
+        // Shop data JSON files
+        this.load.json('shipsData', 'src/assets/shop/ships.json');
+        this.load.json('outfitsData', 'src/assets/shop/outfits.json');
+        this.load.json('buddiesData', 'src/assets/shop/buddies.json');
+        
+        // Load all shop ships
+        this.loadShopShips();
+        
+        // Load all shop outfits
+        this.loadShopOutfits();
+        
+        // Load all shop buddies
+        this.loadShopBuddies();
+    }
+    
+    loadShopShips() {
+        // Load shop ship images
+        const shipFolders = ['BLUE_FANCY', 'CYBER', 'FALCON', 'GREEN', 'RED', 'WHITE', 'XWING'];
+        const shipIds = ['blue_fancy', 'cyber', 'falcon', 'green', 'red', 'white', 'xwing'];
+        
+        shipFolders.forEach((folder, index) => {
+            const id = shipIds[index];
+            this.load.image(`shop-ship-${id}`, `src/assets/shop/ships/${folder}/0.png`);
+        });
+    }
+    
+    loadShopOutfits() {
+        // Load all outfit images
+        const outfits = [
+            'light_blue', 'light_black', 'light_gold', 'light_green', 'light_red',
+            'heavy_blue', 'heavy_black', 'heavy_gold', 'heavy_green', 'heavy_red'
+        ];
+        
+        outfits.forEach(outfit => {
+            this.load.image(`shop-outfit-${outfit}`, `src/assets/shop/outfits/${outfit}.png`);
+        });
+    }
+    
+    loadShopBuddies() {
+        // Load all buddy images
+        const buddies = [
+            { id: 'normal', file: '0_normal.png' },
+            { id: 'alien', file: 'alien.png' },
+            { id: 'aristocrat', file: 'aristocrat.png' },
+            { id: 'chef', file: 'chef.png' },
+            { id: 'cyber', file: 'cyber.png' },
+            { id: 'fancy', file: 'fancy.png' },
+            { id: 'ghost', file: 'ghost.png' },
+            { id: 'log_cabin', file: 'log_cabin.png' },
+            { id: 'lumberjack', file: 'lumberjack.png' },
+            { id: 'ninja', file: 'ninja.png' },
+            { id: 'r2d2', file: 'r2d2.png' },
+            { id: 'red', file: 'red.png' },
+            { id: 'toaster', file: 'toaster.png' }
+        ];
+        
+        buddies.forEach(buddy => {
+            this.load.image(`shop-buddy-${buddy.id}`, `src/assets/shop/buddy/${buddy.file}`);
+        });
     }
 
     queueEnemyVariant(variantFolder) {

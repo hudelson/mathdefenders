@@ -1,0 +1,101 @@
+{
+  "ships": [
+    {
+      "id": "default",
+      "name": "Standard Fighter",
+      "description": "Your trusty default ship. Reliable and balanced.",
+      "cost": 0,
+      "folder": "player_ship",
+      "isDefault": true,
+      "stats": {
+        "speed": 5,
+        "armor": 5,
+        "firepower": 5
+      }
+    },
+    {
+      "id": "blue_fancy",
+      "name": "Azure Phantom",
+      "description": "A sleek blue interceptor with advanced targeting systems.",
+      "cost": 500,
+      "folder": "BLUE_FANCY",
+      "stats": {
+        "speed": 7,
+        "armor": 4,
+        "firepower": 6
+      }
+    },
+    {
+      "id": "cyber",
+      "name": "Cyber Strike",
+      "description": "High-tech cybernetic ship with enhanced shields.",
+      "cost": 750,
+      "folder": "CYBER",
+      "stats": {
+        "speed": 6,
+        "armor": 7,
+        "firepower": 5
+      }
+    },
+    {
+      "id": "falcon",
+      "name": "Space Falcon",
+      "description": "Fast and agile, perfect for quick strikes.",
+      "cost": 600,
+      "folder": "FALCON",
+      "stats": {
+        "speed": 9,
+        "armor": 3,
+        "firepower": 5
+      }
+    },
+    {
+      "id": "green",
+      "name": "Emerald Warrior",
+      "description": "Eco-friendly vessel with regenerating shields.",
+      "cost": 550,
+      "folder": "GREEN",
+      "stats": {
+        "speed": 5,
+        "armor": 6,
+        "firepower": 6
+      }
+    },
+    {
+      "id": "red",
+      "name": "Crimson Fury",
+      "description": "Aggressive red fighter with superior firepower.",
+      "cost": 700,
+      "folder": "RED",
+      "stats": {
+        "speed": 6,
+        "armor": 5,
+        "firepower": 8
+      }
+    },
+    {
+      "id": "white",
+      "name": "Ghost Wing",
+      "description": "Stealth-capable white fighter with balanced stats.",
+      "cost": 650,
+      "folder": "WHITE",
+      "stats": {
+        "speed": 7,
+        "armor": 5,
+        "firepower": 6
+      }
+    },
+    {
+      "id": "xwing",
+      "name": "X-Wing Fighter",
+      "description": "Legendary starfighter known throughout the galaxy.",
+      "cost": 1000,
+      "folder": "XWING",
+      "stats": {
+        "speed": 8,
+        "armor": 6,
+        "firepower": 9
+      }
+    }
+  ]
+}

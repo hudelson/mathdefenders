@@ -30,14 +30,27 @@ window.gameState = {
         subtraction: 1,
         multiplication: 1,
         division: 1
-    }
+    },
+    // Shop ownership tracking
+    ownedShips: ['default'],
+    ownedOutfits: ['light_blue'],
+    ownedBuddies: ['normal'],
+    currentShip: 'default',
+    currentOutfit: 'light_blue',
+    currentBuddy: 'normal'
 };
 
 // Save/Load functions for localStorage
 window.saveProgress = function() {
     const saveData = {
         progress: window.gameState.highestLevels,
-        spaceBux: window.gameState.spaceBux
+        spaceBux: window.gameState.spaceBux,
+        ownedShips: window.gameState.ownedShips,
+        ownedOutfits: window.gameState.ownedOutfits,
+        ownedBuddies: window.gameState.ownedBuddies,
+        currentShip: window.gameState.currentShip,
+        currentOutfit: window.gameState.currentOutfit,
+        currentBuddy: window.gameState.currentBuddy
     };
     localStorage.setItem('mathDefendersProgress', JSON.stringify(saveData));
     console.log('Progress saved:', saveData);
@@ -49,6 +62,12 @@ window.loadProgress = function() {
         const data = JSON.parse(savedData);
         window.gameState.highestLevels = data.progress || window.gameState.highestLevels;
         window.gameState.spaceBux = data.spaceBux || 0;
+        window.gameState.ownedShips = data.ownedShips || ['default'];
+        window.gameState.ownedOutfits = data.ownedOutfits || ['light_blue'];
+        window.gameState.ownedBuddies = data.ownedBuddies || ['normal'];
+        window.gameState.currentShip = data.currentShip || 'default';
+        window.gameState.currentOutfit = data.currentOutfit || 'light_blue';
+        window.gameState.currentBuddy = data.currentBuddy || 'normal';
         console.log('Progress loaded:', data);
     } else {
         console.log('No saved progress found, starting fresh');
@@ -67,7 +86,10 @@ document.addEventListener('DOMContentLoaded', function() {
         LevelSelectScene,
         GameScene,
         UIScene,
-        ShopScene
+        ShopScene,
+        ShipShopScene,
+        OutfitShopScene,
+        BuddyShopScene
     ];
     
     // Create and start the game

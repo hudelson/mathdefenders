@@ -1,0 +1,109 @@
+{
+  "buddies": [
+    {
+      "id": "normal",
+      "name": "Standard Companion",
+      "description": "Your loyal default buddy. Always there for you.",
+      "cost": 0,
+      "filename": "0_normal.png",
+      "isDefault": true,
+      "ability": "Basic support"
+    },
+    {
+      "id": "alien",
+      "name": "Xenomorph Pal",
+      "description": "An otherworldly friend from distant stars.",
+      "cost": 400,
+      "filename": "alien.png",
+      "ability": "Cosmic insight"
+    },
+    {
+      "id": "aristocrat",
+      "name": "Noble Butler",
+      "description": "A refined companion with impeccable manners.",
+      "cost": 600,
+      "filename": "aristocrat.png",
+      "ability": "Bonus SpaceBux"
+    },
+    {
+      "id": "chef",
+      "name": "Space Chef",
+      "description": "Culinary expert who keeps morale high.",
+      "cost": 350,
+      "filename": "chef.png",
+      "ability": "HP regeneration"
+    },
+    {
+      "id": "cyber",
+      "name": "Cyber Sentinel",
+      "description": "Advanced AI companion with tactical support.",
+      "cost": 700,
+      "filename": "cyber.png",
+      "ability": "Enhanced accuracy"
+    },
+    {
+      "id": "fancy",
+      "name": "Dapper Drone",
+      "description": "Stylish buddy with a flair for the dramatic.",
+      "cost": 500,
+      "filename": "fancy.png",
+      "ability": "Inspiration boost"
+    },
+    {
+      "id": "ghost",
+      "name": "Phantom Friend",
+      "description": "Mysterious spectral companion.",
+      "cost": 800,
+      "filename": "ghost.png",
+      "ability": "Dodge boost"
+    },
+    {
+      "id": "log_cabin",
+      "name": "Cabin Critter",
+      "description": "Rustic woodland buddy with charm.",
+      "cost": 300,
+      "filename": "log_cabin.png",
+      "ability": "Natural healing"
+    },
+    {
+      "id": "lumberjack",
+      "name": "Axe Wielder",
+      "description": "Tough lumberjack ready to chop through problems.",
+      "cost": 450,
+      "filename": "lumberjack.png",
+      "ability": "Damage boost"
+    },
+    {
+      "id": "ninja",
+      "name": "Shadow Ninja",
+      "description": "Stealthy warrior trained in ancient arts.",
+      "cost": 750,
+      "filename": "ninja.png",
+      "ability": "Critical hits"
+    },
+    {
+      "id": "r2d2",
+      "name": "Astromech Droid",
+      "description": "Beep boop! A trusty mechanical companion.",
+      "cost": 900,
+      "filename": "r2d2.png",
+      "ability": "Ship repair"
+    },
+    {
+      "id": "red",
+      "name": "Crimson Companion",
+      "description": "Bold red buddy with fierce loyalty.",
+      "cost": 400,
+      "filename": "red.png",
+      "ability": "Attack speed"
+    },
+    {
+      "id": "toaster",
+      "name": "Toaster Bot",
+      "description": "It's a toaster. In space. What more do you need?",
+      "cost": 1000,
+      "filename": "toaster.png",
+      "ability": "Toast generation"
+    }
+  ]
+}

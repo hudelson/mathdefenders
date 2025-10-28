@@ -1,0 +1,95 @@
+{
+  "outfits": [
+    {
+      "id": "light_blue",
+      "name": "Sky Pilot Suit",
+      "description": "Light and comfortable, perfect for beginners.",
+      "cost": 0,
+      "filename": "light_blue.png",
+      "isDefault": true,
+      "type": "light",
+      "color": "blue"
+    },
+    {
+      "id": "light_black",
+      "name": "Shadow Operative",
+      "description": "Sleek black outfit for stealth missions.",
+      "cost": 200,
+      "filename": "light_black.png",
+      "type": "light",
+      "color": "black"
+    },
+    {
+      "id": "light_gold",
+      "name": "Golden Ace",
+      "description": "Prestigious golden suit for elite pilots.",
+      "cost": 500,
+      "filename": "light_gold.png",
+      "type": "light",
+      "color": "gold"
+    },
+    {
+      "id": "light_green",
+      "name": "Forest Ranger",
+      "description": "Nature-inspired green flight suit.",
+      "cost": 250,
+      "filename": "light_green.png",
+      "type": "light",
+      "color": "green"
+    },
+    {
+      "id": "light_red",
+      "name": "Crimson Commander",
+      "description": "Bold red suit for fearless fighters.",
+      "cost": 300,
+      "filename": "light_red.png",
+      "type": "light",
+      "color": "red"
+    },
+    {
+      "id": "heavy_blue",
+      "name": "Titan Blue Armor",
+      "description": "Heavy-duty armor with maximum protection.",
+      "cost": 600,
+      "filename": "heavy_blue.png",
+      "type": "heavy",
+      "color": "blue"
+    },
+    {
+      "id": "heavy_black",
+      "name": "Obsidian Fortress",
+      "description": "The darkest, most intimidating armor available.",
+      "cost": 700,
+      "filename": "heavy_black.png",
+      "type": "heavy",
+      "color": "black"
+    },
+    {
+      "id": "heavy_gold",
+      "name": "Royal Guardian",
+      "description": "Legendary golden armor fit for royalty.",
+      "cost": 1000,
+      "filename": "heavy_gold.png",
+      "type": "heavy",
+      "color": "gold"
+    },
+    {
+      "id": "heavy_green",
+      "name": "Jade Titan",
+      "description": "Heavy green armor with regenerative plating.",
+      "cost": 650,
+      "filename": "heavy_green.png",
+      "type": "heavy",
+      "color": "green"
+    },
+    {
+      "id": "heavy_red",
+      "name": "Crimson Juggernaut",
+      "description": "Ultimate offensive armor in blazing red.",
+      "cost": 800,
+      "filename": "heavy_red.png",
+      "type": "heavy",
+      "color": "red"
+    }
+  ]
+}
