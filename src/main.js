@@ -4,10 +4,17 @@
 // Game configuration
 const config = {
     type: Phaser.AUTO,
-    width: 800,
-    height: 600,
     parent: 'phaser-game',
     backgroundColor: '#000011',
+    // Responsive scaling: keep base 800x600, scale up to fit parent while preserving aspect
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: 800,
+        height: 600,
+        min: { width: 800, height: 600 }
+        // max can be left undefined to allow full parent size
+    },
     physics: {
         default: 'arcade',
         arcade: {
