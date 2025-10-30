@@ -45,14 +45,27 @@ class PreloaderScene extends Phaser.Scene {
             ];
             outfitIds.forEach(id => keysToProcess.push(`shop-outfit-${id}`));
             
-            // Add all shop buddies
-            const buddyIds = ['normal', 'alien', 'aristocrat', 'chef', 'cyber', 'fancy', 
-                             'ghost', 'log_cabin', 'lumberjack', 'ninja', 'r2d2', 'red', 'toaster'];
-            buddyIds.forEach(id => keysToProcess.push(`shop-buddy-${id}`));
-            
             keysToProcess.forEach(k => {
                 if (this.textures.exists(k)) {
                     this.chromaKeyTexture(k, { r: 255, g: 255, b: 255 }, 245);
+                }
+            });
+
+            // For buddies, use corner-based chroma-key to preserve internal white colors
+            const buddyIds = ['normal', 'alien', 'aristocrat', 'chef', 'cyber', 'fancy', 
+                             'ghost', 'log_cabin', 'lumberjack', 'ninja', 'r2d2', 'red', 'toaster'];
+            const greenScreenBuddies = ['chef', 'r2d2'];
+
+            buddyIds.forEach(id => {
+                const key = `shop-buddy-${id}`;
+                if (this.textures.exists(key)) {
+                    if (greenScreenBuddies.includes(id)) {
+                        // Sample the border to find the actual green backdrop (can be pastel)
+                        this.chromaKeyByCornerAverageColor(key, 120);
+                    } else {
+                        // Use corner-based removal for all others
+                        this.chromaKeyByCornerColor(key, 18);
+                    }
                 }
             });
 
@@ -116,6 +129,7 @@ class PreloaderScene extends Phaser.Scene {
         this.load.json('shipsData', 'src/assets/shop/ships.json');
         this.load.json('outfitsData', 'src/assets/shop/outfits.json');
         this.load.json('buddiesData', 'src/assets/shop/buddies.json');
+        this.load.json('puns', 'src/assets/puns.json');
         
         // Load all shop ships
         this.loadShopShips();
@@ -156,14 +170,14 @@ class PreloaderScene extends Phaser.Scene {
             { id: 'normal', file: '0_normal.png' },
             { id: 'alien', file: 'alien.png' },
             { id: 'aristocrat', file: 'aristocrat.png' },
-            { id: 'chef', file: 'chef.png' },
+            { id: 'chef', file: 'chef_green.png' },
             { id: 'cyber', file: 'cyber.png' },
             { id: 'fancy', file: 'fancy.png' },
             { id: 'ghost', file: 'ghost.png' },
             { id: 'log_cabin', file: 'log_cabin.png' },
             { id: 'lumberjack', file: 'lumberjack.png' },
             { id: 'ninja', file: 'ninja.png' },
-            { id: 'r2d2', file: 'r2d2.png' },
+            { id: 'r2d2', file: 'r2d2_green.png' },
             { id: 'red', file: 'red.png' },
             { id: 'toaster', file: 'toaster.png' }
         ];
@@ -282,13 +296,116 @@ class PreloaderScene extends Phaser.Scene {
         }
     }
 
-    // Chroma-key using the color in the top-left pixel as background, with tolerance
-    chromaKeyByCornerColor(key, tolerance = 16) {
+    // Remove pixels close to a specific RGB color using Euclidean distance in RGB space
+    chromaKeyByColor(key, target = { r: 0, g: 255, b: 0 }, tolerance = 70) {
         try {
             const src = this.textures.get(key).getSourceImage();
             if (!src || !(src instanceof HTMLImageElement)) return;
             const w = src.naturalWidth || src.width;
             const h = src.naturalHeight || src.height;
+            if (w === 0 || h === 0) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(src, 0, 0);
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const data = imgData.data;
+            const tol2 = tolerance * tolerance;
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const a = data[i + 3];
+                if (a <= 5) continue; // already transparent
+                const dr = r - target.r;
+                const dg = g - target.g;
+                const db = b - target.b;
+                const dist2 = dr * dr + dg * dg + db * db;
+                if (dist2 <= tol2) {
+                    data[i + 3] = 0; // transparent
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+            this.textures.remove(key);
+            this.textures.addCanvas(key, canvas);
+            console.log(`Chroma-key by target color applied to texture: ${key}`);
+        } catch (e) {
+            console.warn(`Chroma-key by color failed for ${key}:`, e);
+        }
+    }
+
+    // Remove pixels close to the average color sampled from image borders (good for flat/gradient backdrops)
+    chromaKeyByCornerAverageColor(key, tolerance = 110) {
+        try {
+            const src = this.textures.get(key).getSourceImage();
+            if (!src || !(src instanceof HTMLImageElement)) return;
+            const w = src.naturalWidth || src.width;
+            const h = src.naturalHeight || src.height;
+            if (w === 0 || h === 0) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(src, 0, 0);
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const data = imgData.data;
+
+            // Sample multiple border points: 4 corners + midpoints of each edge
+            const sampleCoords = [
+                [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1],
+                [Math.floor(w / 2), 0], [0, Math.floor(h / 2)],
+                [w - 1, Math.floor(h / 2)], [Math.floor(w / 2), h - 1]
+            ];
+            let sr = 0, sg = 0, sb = 0, n = 0;
+            for (const [x, y] of sampleCoords) {
+                const idx = (y * w + x) * 4;
+                const a = data[idx + 3];
+                if (a > 5) {
+                    sr += data[idx];
+                    sg += data[idx + 1];
+                    sb += data[idx + 2];
+                    n++;
+                }
+            }
+            if (n === 0) return;
+            const target = { r: sr / n, g: sg / n, b: sb / n };
+            const tol2 = tolerance * tolerance;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const a = data[i + 3];
+                if (a <= 5) continue;
+                const dr = r - target.r;
+                const dg = g - target.g;
+                const db = b - target.b;
+                const dist2 = dr * dr + dg * dg + db * db;
+                if (dist2 <= tol2) data[i + 3] = 0;
+            }
+            ctx.putImageData(imgData, 0, 0);
+            this.textures.remove(key);
+            this.textures.addCanvas(key, canvas);
+            console.log(`Chroma-key by corner-avg color applied to texture: ${key}`);
+        } catch (e) {
+            console.warn(`Chroma-key by corner-avg failed for ${key}:`, e);
+        }
+    }
+
+    // Chroma-key using the color in the top-left pixel as background, with tolerance
+    chromaKeyByCornerColor(key, tolerance = 24) {
+        try {
+            const src = this.textures.get(key).getSourceImage();
+            if (!src || !(src instanceof HTMLImageElement)) return;
+            const w = src.naturalWidth || src.width;
+            const h = src.naturalHeight || src.height;
+            if (w === 0 || h === 0) return;
+
             const canvas = document.createElement('canvas');
             canvas.width = w;
             canvas.height = h;
@@ -296,31 +413,42 @@ class PreloaderScene extends Phaser.Scene {
             ctx.drawImage(src, 0, 0);
             const imgData = ctx.getImageData(0, 0, w, h);
             const data = imgData.data;
-            // Sample corner pixel color
-            const R = data[0], G = data[1], B = data[2], A = data[3];
-            // If the corner is already transparent, skip chroma-keying
-            if (A <= 10) {
-                console.log(`Corner alpha transparent; skipping chroma-key for ${key}`);
-                return;
-            }
+
+            // Sample all four corner colors
+            const corners = [
+                [data[0], data[1], data[2]], // Top-left
+                [data[(w - 1) * 4], data[(w - 1) * 4 + 1], data[(w - 1) * 4 + 2]], // Top-right
+                [data[(h - 1) * w * 4], data[(h - 1) * w * 4 + 1], data[(h - 1) * w * 4 + 2]], // Bottom-left
+                [data[data.length - 4], data[data.length - 3], data[data.length - 2]] // Bottom-right
+            ];
+
             for (let i = 0; i < data.length; i += 4) {
                 const r = data[i];
                 const g = data[i + 1];
                 const b = data[i + 2];
-                const a = data[i + 3];
-                const dr = Math.abs(r - R);
-                const dg = Math.abs(g - G);
-                const db = Math.abs(b - B);
-                if (a > 32 && dr <= tolerance && dg <= tolerance && db <= tolerance) {
-                    data[i + 3] = 0; // transparent
+                
+                // Check if the pixel color is close to any of the corner colors
+                let isBg = false;
+                for (const corner of corners) {
+                    const dr = Math.abs(r - corner[0]);
+                    const dg = Math.abs(g - corner[1]);
+                    const db = Math.abs(b - corner[2]);
+                    if (dr <= tolerance && dg <= tolerance && db <= tolerance) {
+                        isBg = true;
+                        break;
+                    }
+                }
+
+                if (isBg) {
+                    data[i + 3] = 0; // Make transparent
                 }
             }
             ctx.putImageData(imgData, 0, 0);
             this.textures.remove(key);
             this.textures.addCanvas(key, canvas);
-            console.log(`Chroma-key (corner) applied to texture: ${key}`);
+            console.log(`Advanced corner chroma-key applied to texture: ${key}`);
         } catch (e) {
-            console.warn(`Corner chroma-key failed for ${key}:`, e);
+            console.warn(`Advanced corner chroma-key failed for ${key}:`, e);
         }
     }
 

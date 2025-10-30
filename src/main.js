@@ -89,7 +89,9 @@ document.addEventListener('DOMContentLoaded', function() {
         ShopScene,
         ShipShopScene,
         OutfitShopScene,
-        BuddyShopScene
+        BuddyShopScene,
+        WinScene,
+        LoseScene
     ];
     
     // Create and start the game
