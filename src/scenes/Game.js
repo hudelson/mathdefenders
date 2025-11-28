@@ -505,11 +505,11 @@ class GameScene extends Phaser.Scene {
     }
 
     dealDamageToEnemy() {
-        const baseDamage = 20;
+        const baseDamage = 1; // 1 damage per hit
         let damage = baseDamage;
         
         if (this.currentEquation.specialType === 'red') {
-            damage *= 2; // Double damage
+            damage *= 2; // Double damage = 2
         }
         
         window.gameState.enemyHP = Math.max(0, window.gameState.enemyHP - damage);
@@ -518,10 +518,10 @@ class GameScene extends Phaser.Scene {
         }
         
         if (this.currentEquation.specialType === 'green') {
-            // Heal player
-            window.gameState.playerHP = Math.min(100, window.gameState.playerHP + 15);
+            // Heal player (1 HP)
+            window.gameState.playerHP = Math.min(100, window.gameState.playerHP + 1);
             if (this.player && typeof this.player.heal === 'function') {
-                this.player.heal(15);
+                this.player.heal(1);
             }
         } else if (this.currentEquation.specialType === 'gold') {
             // Award bonus SpaceBux
@@ -533,7 +533,7 @@ class GameScene extends Phaser.Scene {
     }
 
     dealDamageToPlayer() {
-        const damage = 15;
+        const damage = 1; // 1 damage per hit
         window.gameState.playerHP = Math.max(0, window.gameState.playerHP - damage);
         console.log(`Player takes ${damage} damage. HP: ${window.gameState.playerHP}`);
         

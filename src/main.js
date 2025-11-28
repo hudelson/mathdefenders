@@ -88,9 +88,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add scenes to config (order matters for scene management)
     config.scene = [
+        IntroAnimationScene,
         PreloaderScene,
         MainMenuScene,
         LevelSelectScene,
+        TutorialScene,
         GameScene,
         UIScene,
         ShopScene,

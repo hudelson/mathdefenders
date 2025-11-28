@@ -2,6 +2,8 @@
 class PreloaderScene extends Phaser.Scene {
     constructor() {
         super({ key: 'PreloaderScene' });
+        // Cache busting version - increment when assets change
+        this.assetVersion = '?v=' + Date.now();
     }
 
     preload() {
@@ -28,15 +30,31 @@ class PreloaderScene extends Phaser.Scene {
 
             // Attempt to chroma-key white background out of ship images
             const keysToProcess = [
-                'player-ship-0','player-ship-1','player-ship-2','player-ship-3',
-                'enemy-ship-0','enemy-ship-1','enemy-ship-2','enemy-ship-3',
                 'enemy-missile','player-missile',
                 'outfit-light-blue','buddy-normal'
             ];
             
-            // Add all shop ships
+            // Add all enemy ship variants (1-4, each with 0-3 damage states)
+            for (let variant = 1; variant <= 4; variant++) {
+                for (let damage = 0; damage <= 3; damage++) {
+                    keysToProcess.push(`enemy-ship-${variant}-${damage}`);
+                }
+            }
+            
+            // Add default player ship (all damage states)
+            for (let damage = 0; damage <= 3; damage++) {
+                keysToProcess.push(`player-ship-default-${damage}`);
+            }
+            
+            // Add all shop ships (preview and all damage states for gameplay)
             const shopShipIds = ['blue_fancy', 'cyber', 'falcon', 'green', 'red', 'white', 'xwing'];
-            shopShipIds.forEach(id => keysToProcess.push(`shop-ship-${id}`));
+            shopShipIds.forEach(id => {
+                keysToProcess.push(`shop-ship-${id}`); // Preview image
+                // All damage states for gameplay
+                for (let damage = 0; damage <= 3; damage++) {
+                    keysToProcess.push(`player-ship-${id}-${damage}`);
+                }
+            });
             
             // Add all shop outfits
             const outfitIds = [
@@ -45,9 +63,13 @@ class PreloaderScene extends Phaser.Scene {
             ];
             outfitIds.forEach(id => keysToProcess.push(`shop-outfit-${id}`));
             
+            console.log('Chroma-keying textures:', keysToProcess.length, 'total keys');
+            
             keysToProcess.forEach(k => {
                 if (this.textures.exists(k)) {
                     this.chromaKeyTexture(k, { r: 255, g: 255, b: 255 }, 245);
+                } else {
+                    console.warn('Texture does not exist for chroma-key:', k);
                 }
             });
 
@@ -80,17 +102,6 @@ class PreloaderScene extends Phaser.Scene {
             // Ensure placeholders exist for any missing effect textures (after load to avoid key collisions)
             this.ensureEffectPlaceholders();
         });
-
-        // When enemy variants index is loaded, queue images for a random variant
-        this.load.on('filecomplete-json-enemyVariantsIndex', (key, type, data) => {
-            const variants = this.cache.json.get('enemyVariantsIndex');
-            if (Array.isArray(variants) && variants.length) {
-                const choice = Phaser.Utils.Array.GetRandom(variants);
-                window.gameState = window.gameState || {};
-                window.gameState.enemyVariant = choice;
-                this.queueEnemyVariant(choice);
-            }
-        });
     }
 
     create() {
@@ -103,14 +114,13 @@ class PreloaderScene extends Phaser.Scene {
     }
 
     loadRealAssets() {
-        // Player ship images (now from shop/ships/0/)
-        this.load.image('player-ship-0', 'src/assets/shop/ships/0/0_full_health.png');
-        this.load.image('player-ship-1', 'src/assets/shop/ships/0/1_minor_damage.png');
-        this.load.image('player-ship-2', 'src/assets/shop/ships/0/2_heavy_damage.png');
-        this.load.image('player-ship-3', 'src/assets/shop/ships/0/3_destroyed.png');
-
-        // Load index of enemy variants, then dynamically queue one variant
-        this.load.json('enemyVariantsIndex', 'src/assets/enemy_ship/index.json');
+        // Load all enemy ship variants (1=addition, 2=subtraction, 3=multiplication, 4=division)
+        for (let variant = 1; variant <= 4; variant++) {
+            this.load.image(`enemy-ship-${variant}-0`, `src/assets/enemy_ship/${variant}/0_full_health.png`);
+            this.load.image(`enemy-ship-${variant}-1`, `src/assets/enemy_ship/${variant}/1_minor_damage.png`);
+            this.load.image(`enemy-ship-${variant}-2`, `src/assets/enemy_ship/${variant}/2_major_damage.png`);
+            this.load.image(`enemy-ship-${variant}-3`, `src/assets/enemy_ship/${variant}/3_destroyed.png`);
+        }
 
         // Effects (optional assets with fallbacks)
         this.load.image('enemy-missile', 'src/assets/effects/enemy_missile.png');
@@ -119,6 +129,8 @@ class PreloaderScene extends Phaser.Scene {
 
         // Background image
         this.load.image('bg-galaxy', 'src/assets/background/galaxy.png');
+        this.load.image('bg-galaxy-earth', 'src/assets/background/galaxy_earth.png');
+        this.load.image('bg-asteroid-field', 'src/assets/background/asteroid_field.png');
         
         // Shop assets
         this.load.image('bg-shop', 'src/assets/background/shop.png');
@@ -142,14 +154,26 @@ class PreloaderScene extends Phaser.Scene {
     }
     
     loadShopShips() {
-        // Load shop ship images
+        // Load shop ship images - all damage states for gameplay use
         const shipFolders = ['BLUE_FANCY', 'CYBER', 'FALCON', 'GREEN', 'RED', 'WHITE', 'XWING'];
         const shipIds = ['blue_fancy', 'cyber', 'falcon', 'green', 'red', 'white', 'xwing'];
         
         shipFolders.forEach((folder, index) => {
             const id = shipIds[index];
-            this.load.image(`shop-ship-${id}`, `src/assets/shop/ships/${folder}/0.png`);
+            // Load the preview image for shop
+            this.load.image(`shop-ship-${id}`, `src/assets/shop/ships/${folder}/0.png${this.assetVersion}`);
+            
+            // Load all damage states for gameplay (0-3)
+            for (let dmg = 0; dmg <= 3; dmg++) {
+                this.load.image(`player-ship-${id}-${dmg}`, `src/assets/shop/ships/${folder}/${dmg}.png${this.assetVersion}`);
+            }
         });
+        
+        // Also load default ship (id '0') damage states for gameplay
+        for (let dmg = 0; dmg <= 3; dmg++) {
+            const suffix = dmg === 0 ? 'full_health' : dmg === 1 ? 'minor_damage' : dmg === 2 ? 'heavy_damage' : 'destroyed';
+            this.load.image(`player-ship-default-${dmg}`, `src/assets/shop/ships/0/${dmg}_${suffix}.png${this.assetVersion}`);
+        }
     }
     
     loadShopOutfits() {
@@ -187,18 +211,6 @@ class PreloaderScene extends Phaser.Scene {
         });
     }
 
-    queueEnemyVariant(variantFolder) {
-        const base = `src/assets/enemy_ship/${variantFolder}`;
-        this.load.image('enemy-ship-0', `${base}/0_full_health.png`);
-        this.load.image('enemy-ship-1', `${base}/1_minor_damage.png`);
-        this.load.image('enemy-ship-2', `${base}/2_major_damage.png`);
-        this.load.image('enemy-ship-3', `${base}/3_destroyed.png`);
-        // If loader already running, ensure these get processed
-        if (this.load.isLoading()) {
-            this.load.start();
-        }
-    }
-
     createLoadingBar() {
         // Create loading bar graphics
         this.add.text(400, 250, 'Loading Math Defenders...', {
@@ -216,26 +228,30 @@ class PreloaderScene extends Phaser.Scene {
 
     createNonShipPlaceholders() {
         // Create simple placeholder textures for equation blocks and background
-        // Equation blocks - various colors
+        // Equation blocks - white fill for normal
         this.add.graphics()
             .fillStyle(0xffffff)
             .fillRect(0, 0, 32, 32)
             .generateTexture('equation-block', 32, 32);
 
-        this.add.graphics()
-            .fillStyle(0xff0000)
-            .fillRect(0, 0, 32, 32)
-            .generateTexture('equation-block-red', 32, 32);
+        // Special blocks - white fill with colored borders only
+        const g1 = this.add.graphics();
+        g1.fillStyle(0xffffff).fillRect(0, 0, 32, 32);
+        g1.lineStyle(3, 0xff0000).strokeRect(0, 0, 32, 32);
+        g1.generateTexture('equation-block-red', 32, 32);
+        g1.destroy();
 
-        this.add.graphics()
-            .fillStyle(0x00ff00)
-            .fillRect(0, 0, 32, 32)
-            .generateTexture('equation-block-green', 32, 32);
+        const g2 = this.add.graphics();
+        g2.fillStyle(0xffffff).fillRect(0, 0, 32, 32);
+        g2.lineStyle(3, 0x00ff00).strokeRect(0, 0, 32, 32);
+        g2.generateTexture('equation-block-green', 32, 32);
+        g2.destroy();
 
-        this.add.graphics()
-            .fillStyle(0xffff00)
-            .fillRect(0, 0, 32, 32)
-            .generateTexture('equation-block-gold', 32, 32);
+        const g3 = this.add.graphics();
+        g3.fillStyle(0xffffff).fillRect(0, 0, 32, 32);
+        g3.lineStyle(3, 0xffdd00).strokeRect(0, 0, 32, 32);
+        g3.generateTexture('equation-block-gold', 32, 32);
+        g3.destroy();
 
         // Background - simple gradient effect
         this.add.graphics()

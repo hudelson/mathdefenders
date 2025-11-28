@@ -11,6 +11,15 @@
         <div id="phaser-game"></div>
     </div>
     
+    <!-- Debug button (temporary) -->
+    <button id="debug-btn" style="position: fixed; top: 10px; right: 10px; z-index: 9999; padding: 10px; background: #00ffff; border: none; cursor: pointer;" onclick="
+        console.log('=== GAME STATE DEBUG ===');
+        console.log('Current Ship:', window.gameState.currentShip);
+        console.log('Owned Ships:', window.gameState.ownedShips);
+        console.log('LocalStorage:', localStorage.getItem('mathDefendersProgress'));
+        alert('Current Ship: ' + window.gameState.currentShip + '\\nCheck console for full debug info');
+    ">Debug</button>
+    
     <!-- Phaser.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
     
@@ -20,8 +29,10 @@
     <script src="src/classes/EquationBlock.js"></script>
     
     <script src="src/scenes/Preloader.js"></script>
+    <script src="src/scenes/IntroAnimation.js"></script>
     <script src="src/scenes/MainMenu.js"></script>
     <script src="src/scenes/LevelSelect.js"></script>
+    <script src="src/scenes/TutorialScene.js"></script>
     <script src="src/scenes/Game.js"></script>
     <script src="src/scenes/Shop.js"></script>
     <script src="src/scenes/ShipShopScene.js"></script>

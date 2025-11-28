@@ -7,8 +7,17 @@ class LevelSelectScene extends Phaser.Scene {
     create() {
         console.log('LevelSelect: Scene created');
         
-        // Add background
-        this.add.image(400, 300, 'space-background');
+        // Add background - asteroid field with proper aspect ratio (crop, don't stretch)
+        if (this.textures.exists('bg-asteroid-field')) {
+            const bg = this.add.image(400, 300, 'bg-asteroid-field');
+            // Scale to cover the viewport while maintaining aspect ratio
+            const scaleX = 800 / bg.width;
+            const scaleY = 600 / bg.height;
+            const scale = Math.max(scaleX, scaleY);
+            bg.setScale(scale);
+        } else {
+            this.add.image(400, 300, 'space-background');
+        }
         
         // Title
         const modeTitle = window.gameState.gameMode.charAt(0).toUpperCase() + 
@@ -39,43 +48,60 @@ class LevelSelectScene extends Phaser.Scene {
     createLevelButtons() {
         const currentMode = window.gameState.gameMode;
         const highestLevel = window.gameState.highestLevels[currentMode];
-        const maxLevelsToShow = Math.min(highestLevel + 1, 20); // Show up to 20 levels
         
         const buttonStyle = {
-            fontSize: '18px',
+            fontSize: '20px',
             fill: '#ffffff',
             fontFamily: 'Courier New',
             backgroundColor: '#333333',
-            padding: { left: 12, right: 12, top: 8, bottom: 8 }
+            padding: { left: 16, right: 16, top: 12, bottom: 12 }
         };
 
         const lockedStyle = {
-            fontSize: '18px',
-            fill: '#666666',
+            fontSize: '20px',
+            fill: '#444444',
             fontFamily: 'Courier New',
-            backgroundColor: '#222222',
-            padding: { left: 12, right: 12, top: 8, bottom: 8 }
+            backgroundColor: '#1a1a1a',
+            padding: { left: 16, right: 16, top: 12, bottom: 12 }
         };
 
         const hoverStyle = {
-            fontSize: '18px',
+            fontSize: '20px',
             fill: '#00ffff',
             fontFamily: 'Courier New',
             backgroundColor: '#555555',
-            padding: { left: 12, right: 12, top: 8, bottom: 8 }
+            padding: { left: 16, right: 16, top: 12, bottom: 12 }
         };
 
-        // Create level buttons in a grid
-        const buttonsPerRow = 5;
-        const startX = 250;
-        const startY = 150;
-        const buttonSpacing = 70;
+        const endlessStyle = {
+            fontSize: '18px',
+            fill: '#ffff00',
+            fontFamily: 'Courier New',
+            backgroundColor: '#444400',
+            padding: { left: 14, right: 14, top: 10, bottom: 10 }
+        };
 
-        for (let level = 1; level <= maxLevelsToShow; level++) {
-            const row = Math.floor((level - 1) / buttonsPerRow);
-            const col = (level - 1) % buttonsPerRow;
+        const endlessHoverStyle = {
+            fontSize: '18px',
+            fill: '#ffff00',
+            fontFamily: 'Courier New',
+            backgroundColor: '#666600',
+            padding: { left: 14, right: 14, top: 10, bottom: 10 }
+        };
+
+        // Create a 4x3 grid for levels 1-12
+        const cols = 4;
+        const rows = 3;
+        const startX = 220;
+        const startY = 160;
+        const buttonSpacing = 90;
+        const rowSpacing = 70;
+
+        for (let level = 1; level <= 12; level++) {
+            const row = Math.floor((level - 1) / cols);
+            const col = (level - 1) % cols;
             const x = startX + (col * buttonSpacing);
-            const y = startY + (row * 60);
+            const y = startY + (row * rowSpacing);
 
             const isUnlocked = level <= highestLevel + 1;
             const style = isUnlocked ? buttonStyle : lockedStyle;
@@ -92,8 +118,16 @@ class LevelSelectScene extends Phaser.Scene {
             }
         }
 
+        // Add Endless mode button below the grid
+        const endlessButton = this.add.text(400, startY + (rows * rowSpacing) + 30, 'ENDLESS', endlessStyle)
+            .setOrigin(0.5)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerover', () => endlessButton.setStyle(endlessHoverStyle))
+            .on('pointerout', () => endlessButton.setStyle(endlessStyle))
+            .on('pointerdown', () => this.startLevel(999)); // Use 999 as endless level marker
+
         // Show progress info
-        this.add.text(400, 450, `Highest Level Completed: ${highestLevel}`, {
+        this.add.text(400, 480, `Highest Level: ${highestLevel}`, {
             fontSize: '16px',
             fill: '#ffff00',
             fontFamily: 'Courier New'

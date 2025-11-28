@@ -7,8 +7,17 @@ class MainMenuScene extends Phaser.Scene {
     create() {
         console.log('MainMenu: Scene created');
         
-        // Add background
-        this.add.image(400, 300, 'space-background');
+        // Add background - galaxy_earth with proper aspect ratio (crop, don't stretch)
+        if (this.textures.exists('bg-galaxy-earth')) {
+            const bg = this.add.image(400, 300, 'bg-galaxy-earth');
+            // Scale to cover the viewport while maintaining aspect ratio
+            const scaleX = 800 / bg.width;
+            const scaleY = 600 / bg.height;
+            const scale = Math.max(scaleX, scaleY);
+            bg.setScale(scale);
+        } else {
+            this.add.image(400, 300, 'space-background');
+        }
         
         // Game title
         this.add.text(400, 100, 'MATH DEFENDERS', {
@@ -93,6 +102,14 @@ class MainMenuScene extends Phaser.Scene {
             .on('pointerover', () => shopButton.setStyle(hoverStyle))
             .on('pointerout', () => shopButton.setStyle(buttonStyle))
             .on('pointerdown', () => this.scene.start('ShopScene'));
+
+        // Tutorial button
+        const tutorialButton = this.add.text(400, 500, 'How to Play', buttonStyle)
+            .setOrigin(0.5)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerover', () => tutorialButton.setStyle(hoverStyle))
+            .on('pointerout', () => tutorialButton.setStyle(buttonStyle))
+            .on('pointerdown', () => this.scene.start('TutorialScene'));
     }
 
     selectGameMode(mode) {

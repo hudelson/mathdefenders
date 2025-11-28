@@ -5,8 +5,20 @@ class Player {
         this.x = x;
         this.y = y;
         
-    // Create player sprite (use damage level 0 by default)
-    this.sprite = scene.physics.add.sprite(x, y, 'player-ship-0');
+        // Track damage separately (10 HP total, 1 damage per hit)
+        this.damageAccumulated = 0;
+        
+        // Determine which ship to use based on equipped ship in gameState
+        // Default ship uses 'default', shop ships use their ID (blue_fancy, cyber, etc.)
+        this.shipId = window.gameState?.currentShip || 'default';
+        
+        // Build the initial texture key
+        const initialTextureKey = `player-ship-${this.shipId}-0`;
+        
+        console.log('Player constructor - shipId:', this.shipId, 'textureKey:', initialTextureKey);
+        
+        // Create player sprite (use damage level 0 by default)
+        this.sprite = scene.physics.add.sprite(x, y, initialTextureKey);
     // Flip vertically so ship points upward
     this.sprite.setFlipY(true);
     // Increase size by 50%
@@ -42,17 +54,19 @@ class Player {
     takeDamage(amount) {
         console.log(`Player takes ${amount} damage`);
         
+        // Accumulate damage for this ship
+        this.damageAccumulated += amount;
+        
         // Flash red when taking damage
         this.sprite.setTint(0xff0000);
         this.scene.time.delayedCall(200, () => {
             this.sprite.clearTint();
         });
 
-    this.updateTextureByProgress();
+        this.updateTextureByProgress();
 
-        // Play destroyed animation once when HP reaches 0
-        const hp = Math.max(0, window.gameState?.playerHP ?? 100);
-        if (hp === 0 && !this._destroyAnimPlayed) {
+        // Play destroyed animation once when fully destroyed (10 damage)
+        if (this.damageAccumulated >= 10 && !this._destroyAnimPlayed) {
             this._destroyAnimPlayed = true;
             this.playDestroyedAnimation();
         }
@@ -78,16 +92,19 @@ class Player {
         }
     }
 
-    // Choose the texture variant based on player HP. Only show 'destroyed' at 0 HP.
+    // Choose the texture variant based on accumulated damage to this ship
+    // 0-3 damage = image 0, 4-6 damage = image 1, 7-9 damage = image 2, 10 damage = image 3
     updateTextureByProgress() {
-        const hp = Math.max(0, window.gameState?.playerHP ?? 100);
+        const damage = this.damageAccumulated;
         let idx = 0;
-        if (hp === 0) idx = 3;
-        else if (hp > 66) idx = 0;
-        else if (hp > 33) idx = 1;
-        else idx = 2;
-        if (this.scene.textures.exists(`player-ship-${idx}`)) {
-            this.sprite.setTexture(`player-ship-${idx}`);
+        if (damage >= 10) idx = 3;
+        else if (damage >= 7) idx = 2;
+        else if (damage >= 4) idx = 1;
+        else idx = 0;
+        
+        const textureKey = `player-ship-${this.shipId}-${idx}`;
+        if (this.scene.textures.exists(textureKey)) {
+            this.sprite.setTexture(textureKey);
         }
     }
 

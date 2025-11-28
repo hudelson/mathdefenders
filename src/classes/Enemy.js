@@ -5,8 +5,17 @@ class Enemy {
         this.x = x;
         this.y = y;
         
+        // Track damage separately (10 HP total, 1 damage per hit)
+        this.damageAccumulated = 0;
+        
+        // Determine enemy variant based on game mode
+        // addition=1, subtraction=2, multiplication=3, division=4
+        const modeMap = { addition: 1, subtraction: 2, multiplication: 3, division: 4 };
+        const mode = window.gameState?.gameMode || 'multiplication';
+        this.variant = modeMap[mode] || 3;
+        
         // Create enemy sprite (use damage level 0 by default)
-        this.sprite = scene.physics.add.sprite(x, y, 'enemy-ship-0');
+        this.sprite = scene.physics.add.sprite(x, y, `enemy-ship-${this.variant}-0`);
         // Increase size by 50%
         this.sprite.setDisplaySize(192, 192);
         this.sprite.setImmovable(true);
@@ -39,6 +48,9 @@ class Enemy {
     takeDamage(amount) {
         console.log(`Enemy takes ${amount} damage`);
         
+        // Accumulate damage for this ship
+        this.damageAccumulated += amount;
+        
         // Flash red when taking damage
         this.sprite.setTint(0xff0000);
         this.scene.time.delayedCall(200, () => {
@@ -50,9 +62,8 @@ class Enemy {
 
         this.updateTextureByProgress();
 
-        // Play destroyed animation once when HP reaches 0
-        const hp = Math.max(0, window.gameState?.enemyHP ?? 100);
-        if (hp === 0 && !this._destroyAnimPlayed) {
+        // Play destroyed animation once when fully destroyed (10 damage)
+        if (this.damageAccumulated >= 10 && !this._destroyAnimPlayed) {
             this._destroyAnimPlayed = true;
             this.playDestroyedAnimation();
         }
@@ -78,16 +89,19 @@ class Enemy {
         }
     }
 
-    // Choose the texture variant based on enemy HP. Only show 'destroyed' at 0 HP.
+    // Choose the texture variant based on accumulated damage to this ship
+    // 0-3 damage = image 0, 4-6 damage = image 1, 7-9 damage = image 2, 10 damage = image 3
     updateTextureByProgress() {
-        const hp = Math.max(0, window.gameState?.enemyHP ?? 100);
+        const damage = this.damageAccumulated;
         let idx = 0;
-        if (hp === 0) idx = 3;
-        else if (hp > 66) idx = 0;
-        else if (hp > 33) idx = 1;
-        else idx = 2;
-        if (this.scene.textures.exists(`enemy-ship-${idx}`)) {
-            this.sprite.setTexture(`enemy-ship-${idx}`);
+        if (damage >= 10) idx = 3;
+        else if (damage >= 7) idx = 2;
+        else if (damage >= 4) idx = 1;
+        else idx = 0;
+        
+        const texKey = `enemy-ship-${this.variant}-${idx}`;
+        if (this.scene.textures.exists(texKey)) {
+            this.sprite.setTexture(texKey);
         }
     }
 
