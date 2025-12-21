@@ -83,28 +83,45 @@ window.loadProgress = function() {
 
 // Initialize game after DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Load saved progress
-    window.loadProgress();
-    
-    // Add scenes to config (order matters for scene management)
-    config.scene = [
-        IntroAnimationScene,
-        PreloaderScene,
-        MainMenuScene,
-        LevelSelectScene,
-        TutorialScene,
-        GameScene,
-        UIScene,
-        ShopScene,
-        ShipShopScene,
-        OutfitShopScene,
-        BuddyShopScene,
-        WinScene,
-        LoseScene
-    ];
-    
-    // Create and start the game
-    window.game = new Phaser.Game(config);
-    
-    console.log('Math Defenders initialized');
+    const passwordOverlay = document.getElementById('password-overlay');
+    const passwordInput = document.getElementById('password-input');
+    const passwordError = document.getElementById('password-error');
+
+    passwordInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            if (passwordInput.value.toLowerCase() === 'maths') {
+                passwordOverlay.style.display = 'none';
+                startGame();
+            } else {
+                passwordError.textContent = 'ACCESS DENIED';
+                passwordInput.value = '';
+            }
+        }
+    });
+
+    function startGame() {
+        // Load saved progress
+        window.loadProgress();
+        
+        // Add scenes to config (order matters for scene management)
+        config.scene = [
+            IntroAnimationScene,
+            PreloaderScene,
+            MainMenuScene,
+            LevelSelectScene,
+            TutorialScene,
+            GameScene,
+            UIScene,
+            ShopScene,
+            ShipShopScene,
+            OutfitShopScene,
+            BuddyShopScene,
+            WinScene,
+            LoseScene
+        ];
+
+        // Create game instance
+        window.game = new Phaser.Game(config);
+        console.log('Math Defenders initialized');
+    }
 });
